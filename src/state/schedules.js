@@ -12,7 +12,9 @@ export const useSchedules = create(
         set((state) => ({
           schedules: [
             ...state.schedules.filter(
-              (schedule) => schedule["Shift"] !== data["Shift"]
+              (schedule) =>
+                schedule["Shift"] + schedule["Name"] !==
+                data["Shift"] + data["Name"]
             ),
             data,
           ],

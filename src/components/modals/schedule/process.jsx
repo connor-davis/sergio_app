@@ -57,7 +57,7 @@ const ProcessScheduleModal = () => {
         )
         .filter(
           (fileDay) =>
-            fileDay === day || parseInt(fileDay) === parseInt(day) - 1
+            fileDay === day || parseInt(fileDay) === parseInt(day) - 6 // This ensures that we are working with the selected days shifts and the original shifts for the selected day.
         );
 
       if (fileDays.length > 1) {
@@ -174,7 +174,7 @@ const ProcessScheduleModal = () => {
         setDataProcessingBusy(false);
         setDataProcessingMessage(
           fileDays.includes(day)
-            ? "Please upload data for the previous day."
+            ? "Please upload the data for 6 days before the selected day."
             : "Please upload data for the current day."
         );
       }

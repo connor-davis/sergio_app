@@ -16,8 +16,8 @@ export const sortByDayNameTime = (rows) => {
       ) +
         a["Name"] +
         compareAsc(
-          parse(a["Time"], "h:mm a", Date.now()),
-          parse(b["Time"], "h:mm a", Date.now())
+          parse(a["Time"], "hh:mm:ss a", Date.now()),
+          parse(b["Time"], "hh:mm:ss a", Date.now())
         ) >
       compareAsc(
         parse(b["Date"], "M/d/yyyy", Date.now()),
@@ -25,8 +25,8 @@ export const sortByDayNameTime = (rows) => {
       ) +
         b["Name"] +
         compareAsc(
-          parse(b["Time"], "h:mm a", Date.now()),
-          parse(a["Time"], "h:mm a", Date.now())
+          parse(b["Time"], "hh:mm:ss a", Date.now()),
+          parse(a["Time"], "hh:mm:ss a", Date.now())
         )
     )
       return 1;
@@ -37,8 +37,8 @@ export const sortByDayNameTime = (rows) => {
       ) +
         a["Name"] +
         compareAsc(
-          parse(a["Time"], "h:mm a", Date.now()),
-          parse(b["Time"], "h:mm a", Date.now())
+          parse(a["Time"], "hh:mm:ss a", Date.now()),
+          parse(b["Time"], "hh:mm:ss a", Date.now())
         ) <
       compareAsc(
         parse(b["Date"], "M/d/yyyy", Date.now()),
@@ -46,8 +46,8 @@ export const sortByDayNameTime = (rows) => {
       ) +
         b["Name"] +
         compareAsc(
-          parse(b["Time"], "h:mm a", Date.now()),
-          parse(a["Time"], "h:mm a", Date.now())
+          parse(b["Time"], "hh:mm:ss a", Date.now()),
+          parse(a["Time"], "hh:mm:ss a", Date.now())
         )
     )
       return -1;
@@ -144,45 +144,59 @@ export const consolidateData = (
     .filter((data) => previousShiftTeachers[data["Shift"]] !== data["Name"])
     .map((data) => data["Shift"]);
 
+  const lostButPickedUp = previousDataset
+    .map((data) => data["Shift"])
+    .filter((shiftNumber) => pickedUpShifts.includes(shiftNumber));
+
   onComplete(
-    currentDataset.map((data) => {
-      let ShiftType = "-";
+    sortByDayNameTime([
+      ...currentDataset.map((data) => {
+        let ShiftType = "-";
 
-      if (newShifts.includes(data["Shift"])) {
-        ShiftType = "Pickup";
+        if (newShifts.includes(data["Shift"])) {
+          ShiftType = "Pickup";
+
+          return {
+            ...data,
+            ShiftType,
+          };
+        }
+
+        if (pickedUpShifts.includes(data["Shift"])) {
+          ShiftType = "Internal Pickup";
+
+          return {
+            ...data,
+            ShiftType,
+          };
+        }
 
         return {
           ...data,
           ShiftType,
         };
-      }
-
-      if (pickedUpShifts.includes(data["Shift"])) {
-        ShiftType = "Internal Pickup";
-
-        return {
-          ...data,
-          ShiftType,
-        };
-      }
-
-      return {
-        ...data,
-        ShiftType,
-      };
-    }),
-    previousDataset.filter((data) => lostShifts.includes(data["Shift"]))
+      }),
+      ...previousDataset
+        .filter((data) => lostButPickedUp.includes(data["Shift"]))
+        .map((data) => {
+          return { ...data, ShiftType: "Dropped & Picked Up" };
+        }),
+    ]),
+    sortByDayNameTime(
+      previousDataset.filter((data) => lostShifts.includes(data["Shift"]))
+    )
   );
 };
 
-export const exportSchedules = (schedules) => {
+export const exportSchedules = async (schedules) => {
   const worksheet = XLSX.utils.json_to_sheet(schedules);
   const workbook = XLSX.utils.book_new();
 
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Shift Data");
 
   XLSX.writeFile(
     workbook,
-    "AutomaticReport-" + format(Date.now(), "yyyy-MM-dd-hh-mm-ss") + ".xlsx"
+    "AutomaticReport-" + format(Date.now(), "yyyy-MM-dd-hh-mm-ss") + ".xlsx",
+    { cellStyles: true, bookType: "xlsx" }
   );
 };
