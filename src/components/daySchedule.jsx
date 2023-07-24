@@ -1,15 +1,19 @@
-import React from "react";
-import DataTable from "./data-table";
-import { useSchedules } from "../state/schedules";
-import { Button } from "./ui/button";
+import { format, parse } from "date-fns";
 import { ArrowUpDown } from "lucide-react";
 import { sortByDayNameTime } from "../lib/utils";
-import { useShifts } from "../state/shifts";
-import { format, parse } from "date-fns";
+import { useSchedules } from "../state/schedules";
+import { useTemp } from "../state/temp";
+import DataTable from "./data-table";
 
 const DaySchedule = ({ day }) => {
-  const schedules = useSchedules((state) => state.schedules);
-  const shifts = useShifts((state) => state.shifts);
+  const selectedDate = useTemp((state) => state.selectedDate);
+  const schedules = useSchedules((state) =>
+    state.schedules.filter(
+      (schedule) =>
+        format(parse(schedule["Date"], "M/d/yyyy", Date.now()), "M/yyyy") ===
+        format(selectedDate, "M/yyyy")
+    )
+  );
 
   const columns = [
     {
@@ -72,7 +76,7 @@ const DaySchedule = ({ day }) => {
             format(
               parse(schedule["Date"], "M/d/yyyy", Date.now()),
               "M/yyyy"
-            ) === format(Date.now(), "M/yyyy")
+            ) === format(selectedDate, "M/yyyy")
         )
       )}
     />
