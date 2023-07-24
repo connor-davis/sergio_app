@@ -1,4 +1,4 @@
-import { format, parse } from "date-fns";
+import { format, parse, subDays } from "date-fns";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { usePapaParse } from "react-papaparse";
@@ -47,7 +47,7 @@ const ProcessScheduleModal = () => {
       setDataProcessingBusy(true);
 
       const fileDays = files
-        .map((name) =>
+        .map((name) => [
           format(
             parse(
               name.split("II-")[1].replace(".xlsx", ""),
@@ -55,28 +55,48 @@ const ProcessScheduleModal = () => {
               Date.now()
             ),
             "d"
-          )
-        )
-        .filter(
-          (fileDay) =>
-            fileDay === day || parseInt(fileDay) === parseInt(day) - 6 // This ensures that we are working with the selected days shifts and the original shifts for the selected day.
-        );
-
-      if (fileDays.length > 1) {
-        const appropriateFiles = files.filter((name) =>
-          fileDays.includes(
-            format(
+          ),
+          format(
+            subDays(
               parse(
                 name.split("II-")[1].replace(".xlsx", ""),
                 "yyyy-MM-dd-hh-mm-ss",
                 Date.now()
               ),
-              "d"
-            )
-          )
-        );
-        const numFiles = appropriateFiles.length;
+              6
+            ),
+            "d"
+          ),
+        ])
+        .filter(
+          (fileDay) => fileDay[0] === day // This ensures that we are working with the selected days shifts and the original shifts for the selected day.
+        )[0];
 
+      const firstDay = fileDays[1];
+      const secondDay = fileDays[0];
+
+      const appropriateFiles = files.filter(
+        (name) =>
+          format(
+            parse(
+              name.split("II-")[1].replace(".xlsx", ""),
+              "yyyy-MM-dd-hh-mm-ss",
+              Date.now()
+            ),
+            "d"
+          ) === firstDay ||
+          format(
+            parse(
+              name.split("II-")[1].replace(".xlsx", ""),
+              "yyyy-MM-dd-hh-mm-ss",
+              Date.now()
+            ),
+            "d"
+          ) === secondDay
+      );
+      const numFiles = appropriateFiles.length;
+
+      if (numFiles > 1) {
         setDataProcessingBusy(true);
 
         setDataProcessingMessage(undefined);
@@ -170,9 +190,7 @@ const ProcessScheduleModal = () => {
       } else {
         setDataProcessingBusy(false);
         setDataProcessingMessage(
-          fileDays.includes(day)
-            ? "Please upload the data for 6 days before the selected day."
-            : "Please upload data for the current day."
+          "Please ensure that you have the selected days dialogue data uploaded and the dialogue data from 6 days before the selected day uploaded."
         );
       }
     });

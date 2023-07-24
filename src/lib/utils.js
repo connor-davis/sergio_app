@@ -208,6 +208,8 @@ export const consolidateData = (
   );
 };
 
+export const pivotBuilder = () => {};
+
 export const exportSchedules = async (schedules) => {
   const worksheet = XLSX.utils.json_to_sheet(sortByDayNameTime(schedules));
   const workbook = XLSX.utils.book_new();
