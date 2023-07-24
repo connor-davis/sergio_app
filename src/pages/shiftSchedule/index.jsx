@@ -1,16 +1,14 @@
-import { useTheme } from "next-themes";
-import { useState } from "react";
-import { usePapaParse } from "react-papaparse";
+import { getDaysInMonth } from "date-fns";
+import { Download, Upload } from "lucide-react";
+import { Outlet, useNavigate } from "react-router-dom";
+import DaySchedule from "../../components/daySchedule";
 import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
-import { useToast } from "../../components/ui/use-toast";
 import {
-  consolidateData,
-  exportSchedules,
-  processData,
-  sortByDayNameTime,
-} from "../../lib/utils";
-import { ScrollArea } from "../../components/ui/scroll-area";
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
 import { Label } from "../../components/ui/label";
 import {
   Tabs,
@@ -18,21 +16,11 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/tabs";
-import { getDaysInMonth } from "date-fns";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card";
-import { useNavigate } from "react-router-dom";
-import { Outlet } from "react-router-dom";
+  exportSchedules,
+  sortByDayNameTime
+} from "../../lib/utils";
 import { useSchedules } from "../../state/schedules";
-import DataTable from "../../components/data-table";
-import DaySchedule from "../../components/daySchedule";
-import { useShifts } from "../../state/shifts";
-import { Upload } from "lucide-react";
-import { Download } from "lucide-react";
 
 const ShiftSchedulePage = () => {
   const navigate = useNavigate();

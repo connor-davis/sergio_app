@@ -1,8 +1,7 @@
 import { useTheme } from "next-themes";
-import { useState } from "react";
-import { usePapaParse } from "react-papaparse";
 import { Route, Routes, useNavigate } from "react-router-dom";
-import AddTeacherModal from "./components/modals/teachers/add";
+import ProcessScheduleModal from "./components/modals/schedule/process";
+import UploadScheduleModal from "./components/modals/schedule/upload";
 import NavigationMenu from "./components/navigationMenu";
 import Sidebar from "./components/sidebar";
 import { Card } from "./components/ui/card";
@@ -21,23 +20,26 @@ import {
   MenubarTrigger,
 } from "./components/ui/menubar";
 import { Toaster } from "./components/ui/toaster";
-import { useToast } from "./components/ui/use-toast";
-import { consolidateData } from "./lib/utils";
-import Dashboard from "./pages/dashboard";
-import ShiftSchedulePage from "./pages/shiftSchedule";
-import TeachersPage from "./pages/teachers";
-import { useTeachers } from "./state/teachers";
-import UploadScheduleModal from "./components/modals/schedule/upload";
-import { useSchedules } from "./state/schedules";
-import { useShifts } from "./state/shifts";
 import FileArchivePage from "./pages/fileArchive";
-import { useHistoricalFiles } from "./state/historicalFiles";
-import ProcessScheduleModal from "./components/modals/schedule/process";
+import ShiftSchedulePage from "./pages/shiftSchedule";
+import {
+  clearFilesFromIndexedDB,
+  useHistoricalFiles,
+} from "./state/historicalFiles";
+import { useSchedules } from "./state/schedules";
+import { useTeachers } from "./state/teachers";
 
 const App = () => {
   const clearTeachers = useTeachers((state) => state.clearTeachers);
   const clearSchedules = useSchedules((state) => state.clearSchedules);
-  const clearFiles = useHistoricalFiles((state) => state.clearFiles);
+  const clearHistoricalFiles = useHistoricalFiles((state) => state.clearFiles);
+  const clearFiles = () => {
+    const clearNames = clearHistoricalFiles();
+    const clearBlobs = clearFilesFromIndexedDB();
+
+    clearNames();
+    clearBlobs();
+  };
 
   const navigate = useNavigate();
 
@@ -120,11 +122,7 @@ const App = () => {
               />
             </Route> */}
             <Route exact path="/" element={<ShiftSchedulePage />}>
-              <Route
-                exact
-                path="/upload"
-                element={<UploadScheduleModal />}
-              />
+              <Route exact path="/upload" element={<UploadScheduleModal />} />
               <Route
                 exact
                 path="/process/:day"

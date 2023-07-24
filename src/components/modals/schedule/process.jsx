@@ -1,8 +1,18 @@
 import { format, parse } from "date-fns";
+import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { usePapaParse } from "react-papaparse";
 import { useNavigate, useParams } from "react-router-dom";
-import { useHistoricalFiles } from "../../../state/historicalFiles";
+import {
+  consolidateData,
+  processDialogueData,
+  sortByDayNameTime,
+} from "../../../lib/utils";
+import {
+  readFileFromIndexedDB,
+  useHistoricalFiles,
+} from "../../../state/historicalFiles";
+import { useSchedules } from "../../../state/schedules";
 import {
   Dialog,
   DialogContent,
@@ -13,13 +23,12 @@ import {
 import { Label } from "../../ui/label";
 import { Progress } from "../../ui/progress";
 import { useToast } from "../../ui/use-toast";
-import { consolidateData, processData } from "../../../lib/utils";
-import { motion } from "framer-motion";
-import { useSchedules } from "../../../state/schedules";
 
 const ProcessScheduleModal = () => {
   const navigate = useNavigate();
   const { day } = useParams();
+
+  const { toast } = useToast();
 
   const { readString } = usePapaParse();
 
@@ -31,24 +40,17 @@ const ProcessScheduleModal = () => {
   const [dataProcessingProgress, setDataProcessingProgress] =
     useState(undefined);
 
-  const files = useHistoricalFiles((state) =>
-    Object.values(state.files).map((file, index) => {
-      return {
-        content: file,
-        name: Object.keys(state.files)[index],
-      };
-    })
-  );
+  const files = useHistoricalFiles((state) => state.files);
 
   useEffect(() => {
     const i = setTimeout(() => {
       setDataProcessingBusy(true);
 
       const fileDays = files
-        .map(({ name }) =>
+        .map((name) =>
           format(
             parse(
-              name.split("II-")[1].replace(".csv", ""),
+              name.split("II-")[1].replace(".xlsx", ""),
               "yyyy-MM-dd-hh-mm-ss",
               Date.now()
             ),
@@ -61,11 +63,11 @@ const ProcessScheduleModal = () => {
         );
 
       if (fileDays.length > 1) {
-        const appropriateFiles = files.filter(({ name }) =>
+        const appropriateFiles = files.filter((name) =>
           fileDays.includes(
             format(
               parse(
-                name.split("II-")[1].replace(".csv", ""),
+                name.split("II-")[1].replace(".xlsx", ""),
                 "yyyy-MM-dd-hh-mm-ss",
                 Date.now()
               ),
@@ -82,92 +84,87 @@ const ProcessScheduleModal = () => {
           () => setDataProcessingMessage("Processing " + numFiles + " files."),
           100
         );
+        setDataProcessingProgress(0);
 
         let dataset = [];
 
         for (let fileIndex = 0; fileIndex < numFiles; fileIndex++) {
-          setTimeout(() => {
-            readString(appropriateFiles[fileIndex]["content"], {
-              worker: true,
-              header: true,
-              skipEmptyLines: true,
-              complete: ({ data }) => {
-                processData(
-                  data,
-                  () => {},
-                  (data) => {
-                    dataset.push(data);
+          setTimeout(async () => {
+            processDialogueData(
+              await readFileFromIndexedDB(appropriateFiles[fileIndex]),
+              setDataProcessingMessage,
+              setDataProcessingProgress,
+              (data) => {
+                dataset.push(sortByDayNameTime(data));
+
+                setDataProcessingMessage(undefined);
+
+                setTimeout(
+                  () =>
+                    setDataProcessingMessage(
+                      "Processed " +
+                        (fileIndex + 1) +
+                        "/" +
+                        numFiles +
+                        " files."
+                    ),
+                  100
+                );
+                setDataProcessingProgress(
+                  Math.ceil(((fileIndex + 1) / numFiles) * 100)
+                );
+
+                setTimeout(() => {
+                  if (fileIndex + 1 === numFiles) {
+                    setDataProcessingProgress(undefined);
 
                     setDataProcessingMessage(undefined);
-
                     setTimeout(
                       () =>
                         setDataProcessingMessage(
-                          "Processed " +
-                            (fileIndex + 1) +
-                            "/" +
-                            numFiles +
-                            " files."
+                          "Consolidating data between days."
                         ),
                       100
                     );
-                    setDataProcessingProgress(
-                      Math.ceil(((fileIndex + 1) / numFiles) * 100)
+
+                    dataset[0] = dataset[0].filter(
+                      (data) =>
+                        format(
+                          parse(data["Date"], "M/d/yyyy", Date.now()),
+                          "d"
+                        ) === day
                     );
 
-                    setTimeout(() => {
-                      if (fileIndex + 1 === numFiles) {
+                    dataset[1] = dataset[1].filter(
+                      (data) =>
+                        parseInt(
+                          format(
+                            parse(data["Date"], "M/d/yyyy", Date.now()),
+                            "d"
+                          )
+                        ) === parseInt(day)
+                    );
+
+                    consolidateData(
+                      sortByDayNameTime(dataset[0]),
+                      sortByDayNameTime(dataset[1]),
+                      setDataProcessingMessage,
+                      setDataProcessingProgress,
+                      (schedules, lostSchedules) => {
+                        schedules.map(addSchedule);
+                        lostSchedules.map(addLostSchedule);
+
+                        setDataProcessingBusy(false);
+                        setDataProcessingMessage(undefined);
                         setDataProcessingProgress(undefined);
 
-                        setDataProcessingMessage(undefined);
-                        setTimeout(
-                          () =>
-                            setDataProcessingMessage(
-                              "Consolidating data between days."
-                            ),
-                          100
-                        );
-
-                        dataset[0] = dataset[0].filter(
-                          (data) =>
-                            format(
-                              parse(data["Date"], "M/d/yyyy", Date.now()),
-                              "d"
-                            ) === day
-                        );
-
-                        dataset[1] = dataset[1].filter(
-                          (data) =>
-                            parseInt(
-                              format(
-                                parse(data["Date"], "M/d/yyyy", Date.now()),
-                                "d"
-                              )
-                            ) === parseInt(day)
-                        );
-
-                        consolidateData(
-                          dataset[0],
-                          dataset[1],
-                          () => {},
-                          () => {},
-                          (schedules, lostSchedules) => {
-                            schedules.map(addSchedule);
-                            lostSchedules.map(addLostSchedule);
-
-                            setDataProcessingBusy(false);
-                            setDataProcessingMessage(undefined);
-                            setDataProcessingProgress(undefined);
-
-                            navigate("/");
-                          }
-                        );
+                        navigate("/");
                       }
-                    });
+                    );
                   }
-                );
-              },
-            });
+                });
+              }
+            );
           }, 1000 * fileIndex);
         }
       } else {
@@ -204,12 +201,12 @@ const ProcessScheduleModal = () => {
 
         {(dataProcessingProgress || dataProcessingMessage) && (
           <div className="flex flex-col space-y-2">
-            {dataProcessingMessage && (
+            {dataProcessingMessage !== undefined && (
               <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }}>
                 <Label>{dataProcessingMessage}</Label>
               </motion.div>
             )}
-            {dataProcessingProgress && (
+            {dataProcessingProgress !== undefined && (
               <Progress value={dataProcessingProgress} />
             )}
           </div>

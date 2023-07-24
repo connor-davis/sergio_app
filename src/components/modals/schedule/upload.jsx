@@ -1,28 +1,17 @@
-import { useEffect, useState } from "react";
-import { usePapaParse } from "react-papaparse";
-import { useNavigate, useParams } from "react-router-dom";
-import { consolidateData, processData } from "../../../lib/utils";
-import { useSchedules } from "../../../state/schedules";
-import { Button } from "../../ui/button";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useHistoricalFiles } from "../../../state/historicalFiles";
+import { useTemp } from "../../../state/temp";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
-  DialogTitle,
+  DialogTitle
 } from "../../ui/dialog";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
-import { useToast } from "../../ui/use-toast";
 import { Progress } from "../../ui/progress";
-import { useTeachers } from "../../../state/teachers";
-import { useShifts } from "../../../state/shifts";
-import { Loader2 } from "lucide-react";
-import { useTemp } from "../../../state/temp";
-import { format, parse } from "date-fns";
-import { v4 } from "uuid";
-import { useHistoricalFiles } from "../../../state/historicalFiles";
 
 const UploadScheduleModal = () => {
   const navigate = useNavigate();
@@ -49,26 +38,19 @@ const UploadScheduleModal = () => {
       setTimeout(() => {
         const file = event.target.files[i];
 
-        const reader = new FileReader();
+        // Save the file to the IndexedDB database
+        addFile(file.name, file);
 
-        reader.addEventListener("load", (event) => {
-          const csvString = event.target.result;
+        setDataProcessingMessage(
+          "Stored " + (i + 1) + "/" + numFiles + " files."
+        );
+        setDataProcessingProgress(Math.ceil(((i + 1) / numFiles) * 100));
 
-          addFile(file.name, csvString);
-
-          setDataProcessingMessage(
-            "Stored " + (i + 1) + "/" + numFiles + " files."
-          );
-          setDataProcessingProgress(Math.ceil(((i + 1) / numFiles) * 100));
-
-          if (i + 1 === numFiles) {
-            setDataProcessingBusy(false);
-            setDataProcessingMessage(undefined);
-            setDataProcessingProgress(undefined);
-          }
-        });
-
-        reader.readAsText(file, "utf-8");
+        if (i + 1 === numFiles) {
+          setDataProcessingBusy(false);
+          setDataProcessingMessage(undefined);
+          setDataProcessingProgress(undefined);
+        }
       }, 1000 * i);
     }
   };
@@ -92,11 +74,11 @@ const UploadScheduleModal = () => {
 
         {!dataProcessingBusy && (
           <div className="flex flex-col space-y-2">
-            <Label htmlFor="csv">Schedule CSV</Label>
+            <Label htmlFor="xlsx">Schedule file/s</Label>
             <Input
-              id="csv"
+              id="xlsx"
               type="file"
-              accept="text/csv"
+              accept=".xlsx"
               multiple="multiple"
               onChange={handleUpload}
             />

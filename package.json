@@ -44,6 +44,7 @@
     "clsx": "^1.2.1",
     "cmdk": "^0.2.0",
     "date-fns": "^2.30.0",
+    "dexie": "^3.2.4",
     "exceljs": "^4.3.0",
     "framer-motion": "^10.12.18",
     "idb-keyval": "^6.2.1",
