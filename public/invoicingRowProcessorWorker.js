@@ -1,27 +1,5 @@
 onmessage = (event) => {
-  let { data, selectedDay } = event.data;
-
-  postMessage({
-    type: "message",
-    data: `Filtering ${data.length} rows.`,
-  });
-
-  data = data.filter((schedule, index) => {
-    postMessage({
-      type: "message",
-      data: `Filtered ${index + 1}/${data.length} rows.`,
-    });
-    postMessage({
-      type: "progress",
-      data: Math.ceil((index + 1 / data.length) * 100),
-    });
-
-    return (
-      schedule["Activity_Start_Time"].split(" ")[0].split("/").join("-") ===
-      selectedDay
-    );
-  });
-
+  let { data } = event.data;
   postMessage({
     type: "message",
     data: `Processing ${data.length} rows.`,

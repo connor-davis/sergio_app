@@ -1,7 +1,6 @@
 import { clsx } from "clsx";
-import { compareAsc, format, getDaysInMonth, parse } from "date-fns";
+import { compareAsc, format, parse } from "date-fns";
 import ExcelJS from "exceljs";
-import { saveAs } from "file-saver";
 import { twMerge } from "tailwind-merge";
 import * as XLSX from "xlsx";
 
@@ -320,290 +319,56 @@ export const consolidateData = (
   );
 };
 
-// export const consolidatorPivotBuilder = (
-//   schedules = [],
-//   selectedDate = Date.now(),
-//   Sheet
-// ) => {
-//   return new Promise((resolve, reject) => {
-//     try {
-//       Sheet.addTable({
-//         name: format(selectedDate, "MMM-yy"),
-//         ref: "A1",
-//         headerRow: true,
-//         totalsRow: true,
-//         columns: [
-//           { name: "Tutor", totalsRowLabel: "Grand Total", filterButton: true },
-//           {
-//             name: "Pickups",
-//             totalsRowFunction: "sum",
-//             filterButton: false,
-//           },
-//           {
-//             name: "Internal Pickups",
-//             totalsRowFunction: "sum",
-//             filterButton: false,
-//           },
-//           {
-//             name: "Dropped & Picked Up",
-//             totalsRowFunction: "sum",
-//             filterButton: false,
-//           },
-//           {
-//             name: "Dropped",
-//             totalsRowFunction: "sum",
-//             filterButton: false,
-//           },
-//         ],
-//         rows: [...new Set(schedules.map((schedule) => schedule["Name"]))]
-//           .sort((a, b) => {
-//             if (a.substring(0, 1) > b.substring(0, 1)) return 1;
-//             if (a.substring(0, 1) < b.substring(0, 1)) return -1;
+// const consolidatedSheet = (schedules = [], selectedDate = Date.now()) => {
+//   const workbook = XLSX.utils.book_new();
 
-//             return 0;
-//           })
-//           .map((teacher) => [
-//             teacher,
-//             schedules.filter(
-//               (_schedule) =>
-//                 _schedule["Name"] === teacher &&
-//                 _schedule["ShiftType"] === "Pickup"
-//             ).length,
-//             schedules.filter(
-//               (_schedule) =>
-//                 _schedule["Name"] === teacher &&
-//                 _schedule["ShiftType"] === "Internal Pickup"
-//             ).length,
-//             schedules.filter(
-//               (_schedule) =>
-//                 _schedule["Name"] === teacher &&
-//                 _schedule["ShiftType"] === "Dropped & Picked Up"
-//             ).length,
-//             schedules.filter(
-//               (_schedule) =>
-//                 _schedule["Name"] === teacher &&
-//                 _schedule["ShiftType"] === "Dropped"
-//             ).length,
-//           ]),
-//       });
-
-//       resolve(Sheet);
-//     } catch (error) {
-//       reject(error);
-//     }
-//   });
-// };
-
-// export const teachersEfficiencyPivotBuilder = (
-//   schedules = [],
-//   teachers = [],
-//   days = [],
-//   Sheet
-// ) => {
-//   days = days.map((day, index) => {
-//     const cellIndex = index * 5;
-
-//     const teachersDay = teachers
-//       .sort((a, b) => {
-//         if (a["teacherName"] > b["teacherName"]) return 1;
-//         if (a["teacherName"] < b["teacherName"]) return -1;
-
-//         return 0;
-//       })
-//       .map((teacher) => {
-//         let scheduled =
+//   Array(getDaysInMonth(selectedDate))
+//     .fill(null)
+//     .map((_, index) => {
+//       return {
+//         day: index + 1,
+//         schedules: sortBy(
 //           schedules.filter(
-//             (schedule) =>
-//               schedule["Date"] === format(day, "M/d/yyyy") &&
-//               schedule["Name"] === teacher.teacherName
-//           ).length * 2;
+//             (schedule) => parseInt(schedule["Day"]) === index + 1
+//           ),
+//           ["Date", "ShiftGroup", "Name", "Time"]
+//         ),
+//       };
+//     })
+//     .filter(({ schedules }) => schedules.length > 0)
+//     .map(({ schedules, day }) => {
+//       const worksheet = XLSX.utils.json_to_sheet(schedules);
 
-//         let taught = teacher.shifts
-//           ? teacher.shifts.filter(
-//               (schedule) =>
-//                 format(
-//                   parse(
-//                     schedule["Activity_Start_Time"],
-//                     "M/d/yyyy hh:mm:ss a",
-//                     Date.now()
-//                   ),
-//                   "M/d/yyyy"
-//                 ) === format(day, "M/d/yyyy")
-//             ).length
-//           : 0;
-//         let noShows = teacher.shifts
-//           ? teacher.shifts.filter(
-//               (schedule) =>
-//                 format(
-//                   parse(
-//                     schedule["Activity_Start_Time"],
-//                     "M/d/yyyy hh:mm:ss a",
-//                     Date.now()
-//                   ),
-//                   "M/d/yyyy"
-//                 ) === format(day, "M/d/yyyy") &&
-//                 schedule["Eligible_Status"].includes("Not Eligible")
-//             ).length
-//           : 0;
+//       XLSX.utils.book_append_sheet(
+//         workbook,
+//         worksheet,
+//         `${format(selectedDate, "M")}-${day}-${format(selectedDate, "yyyy")}`
+//       );
+//     });
 
-//         const initial = ["-", scheduled, taught, noShows];
-//         const taughtMinusScheduled = initial[2] - initial[1];
-
-//         return [...initial, taughtMinusScheduled - initial[3]];
-//       });
-
-//     return {
-//       name: format(day, "M/d/yyyy"),
-//       ref: `${Sheet.getColumn(cellIndex + 2).letter}1`,
-//       headerRow: true,
-//       totalsRow: true,
-//       columns: [
-//         {
-//           name: format(day, "M/d/yyyy"),
-//           filterButton: false,
-//         },
-//         {
-//           name: "Scheduled",
-//           totalsRowFunction: "sum",
-//           filterButton: false,
-//         },
-//         {
-//           name: "Taught",
-//           totalsRowFunction: "sum",
-//           filterButton: false,
-//         },
-//         {
-//           name: "No Shows",
-//           totalsRowFunction: "sum",
-//           filterButton: false,
-//         },
-//         {
-//           name: "Variance",
-//           totalsRowFunction: "sum",
-//           filterButton: false,
-//         },
-//       ],
-//       rows: teachersDay,
-//     };
-//   });
-
-//   return new Promise((resolve, reject) => {
-//     try {
-//       Sheet.addTable({
-//         name: "Tutor",
-//         ref: "A1",
-//         headerRow: true,
-//         totalsRow: true,
-//         columns: [{ name: "Tutor", filterButton: false }],
-//         rows: teachers
-//           .sort((a, b) => {
-//             if (a["teacherName"] > b["teacherName"]) return 1;
-//             if (a["teacherName"] < b["teacherName"]) return -1;
-
-//             return 0;
-//           })
-//           .map((teacher) => [teacher.teacherName]),
-//       });
-
-//       days.map((day) => Sheet.addTable(day));
-
-//       resolve(Sheet);
-//     } catch (error) {
-//       resolve(error);
-//     }
-//   });
+//   XLSX.writeFile(
+//     workbook,
+//     "AutomaticReport-Consolidated-Data-" +
+//       format(Date.now(), "yyyy-MM-dd-hh-mm-ss") +
+//       ".xlsx",
+//     { cellStyles: true, bookType: "xlsx" }
+//   );
 // };
 
-const consolidatedSheet = (schedules = [], selectedDate = Date.now()) => {
+export const exportEfficiencyTables = async (data) => {
   const workbook = XLSX.utils.book_new();
 
-  Array(getDaysInMonth(selectedDate))
-    .fill(null)
-    .map((_, index) => {
-      return {
-        day: index + 1,
-        schedules: sortBy(
-          schedules.filter(
-            (schedule) => parseInt(schedule["Day"]) === index + 1
-          ),
-          ["Date", "ShiftGroup", "Name", "Time"]
-        ),
-      };
-    })
-    .filter(({ schedules }) => schedules.length > 0)
-    .map(({ schedules, day }) => {
-      const worksheet = XLSX.utils.json_to_sheet(schedules);
+  data.map((groupTable) => {
+    const worksheet = XLSX.utils.aoa_to_sheet(groupTable[1]);
 
-      XLSX.utils.book_append_sheet(
-        workbook,
-        worksheet,
-        `${format(selectedDate, "M")}-${day}-${format(selectedDate, "yyyy")}`
-      );
-    });
+    XLSX.utils.book_append_sheet(workbook, worksheet, groupTable[0]);
+  });
 
   XLSX.writeFile(
     workbook,
-    "AutomaticReport-Consolidated-Data-" +
+    "AutomaticReport-Group-Efficencies" +
       format(Date.now(), "yyyy-MM-dd-hh-mm-ss") +
       ".xlsx",
     { cellStyles: true, bookType: "xlsx" }
   );
-};
-
-export const exportSchedules = async (
-  schedules = [],
-  teachers = [],
-  selectedDate = Date.now()
-) => {
-  consolidatedSheet(schedules, selectedDate);
-
-  // const Workbook = new ExcelJS.Workbook();
-
-  // Workbook.creator = "LoneWolf Software | Automatic Reports";
-  // Workbook.lastModifiedBy = "LoneWolf Software | Automatic Reports";
-  // Workbook.created = new Date(selectedDate);
-  // Workbook.modified = new Date(selectedDate);
-
-  // const ConsolidatorPivots = Workbook.addWorksheet("Consolidator Pivots");
-  // const TeacherEfficiencyPivots = Workbook.addWorksheet(
-  //   "Teacher Efficiency Pivots"
-  // );
-
-  // const days = Array(getDaysInMonth(selectedDate))
-  //   .fill(null)
-  //   .map((_, index) =>
-  //     parse(
-  //       `${format(selectedDate, "M")}/${index + 1}/${format(
-  //         selectedDate,
-  //         "yyyy"
-  //       )}`,
-  //       "M/d/yyyy",
-  //       Date.now()
-  //     )
-  //   );
-
-  // consolidatorPivotBuilder(schedules, selectedDate, ConsolidatorPivots)
-  //   .then(() => {
-  //     teachersEfficiencyPivotBuilder(
-  //       schedules,
-  //       teachers,
-  //       days,
-  //       TeacherEfficiencyPivots
-  //     )
-  //       .then(() => {
-  //         Workbook.xlsx.writeBuffer().then((data) => {
-  //           const blob = new Blob([data], {
-  //             type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8",
-  //           });
-  //           saveAs(
-  //             blob,
-  //             "AutomaticReport-" +
-  //               format(Date.now(), "yyyy-MM-dd-hh-mm-ss") +
-  //               ".xlsx"
-  //           );
-  //         });
-  //       })
-  //       .catch(console.log);
-  //   })
-  //   .catch(console.log);
 };
