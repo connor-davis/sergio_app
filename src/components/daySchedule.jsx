@@ -1,21 +1,57 @@
 import { format, parse } from "date-fns";
-import { ArrowUpDown } from "lucide-react";
-import { sortByDayNameTime } from "../lib/utils";
+import { motion } from "framer-motion";
+import { ArrowUpDown, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { sortBy } from "../lib/utils";
 import { useSchedules } from "../state/schedules";
 import { useTemp } from "../state/temp";
 import DataTable from "./data-table";
+import { Dialog, DialogContent } from "./ui/dialog";
 
 const DaySchedule = ({ day }) => {
   const selectedDate = useTemp((state) => state.selectedDate);
   const schedules = useSchedules((state) =>
-    state.schedules.filter(
-      (schedule) =>
-        format(parse(schedule["Date"], "M/d/yyyy", Date.now()), "M/yyyy") ===
-        format(selectedDate, "M/yyyy")
+    JSON.parse(
+      `[${[
+        ...Object.keys(state.schedules).filter(
+          (date) =>
+            format(parse(date, "M-d-yyyy", Date.now()), "M/d/yyyy") ===
+            `${format(selectedDate, "M")}/${day}/${format(
+              selectedDate,
+              "yyyy"
+            )}`
+        ),
+      ]
+        .map((day) => state.schedules[day])
+        .map((schedule) =>
+          JSON.stringify(schedule).replace("[", "").replace("]", "")
+        )
+        .join(",")}]`
     )
   );
 
   const columns = [
+    {
+      accessorKey: "ShiftGroup",
+      header: ({ column }) => (
+        <div
+          className="flex items-center px-1 space-x-2 cursor-pointer"
+          onClick={() =>
+            column.toggleSorting(
+              column.getIsSorted() ? column.getIsSorted() === "asc" : true
+            )
+          }
+        >
+          Group
+          <ArrowUpDown className="w-4 h-4 ml-2" />
+        </div>
+      ),
+      cell: ({ row }) => {
+        const Group = row.getValue("ShiftGroup");
+
+        return <div className="text-left">{Group}</div>;
+      },
+    },
     {
       accessorKey: "Name",
       header: ({ column }) => (
@@ -66,20 +102,39 @@ const DaySchedule = ({ day }) => {
     },
   ];
 
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setLoading(false);
+    });
+
+    return () => clearTimeout(t);
+  }, [schedules]);
+
   return (
-    <DataTable
-      columns={columns}
-      data={sortByDayNameTime(
-        schedules.filter(
-          (schedule) =>
-            schedule["Day"] === day &&
-            format(
-              parse(schedule["Date"], "M/d/yyyy", Date.now()),
-              "M/yyyy"
-            ) === format(selectedDate, "M/yyyy")
-        )
+    <>
+      <Dialog open={loading}>
+        <DialogContent className="sm:max-w-[425px]">
+          <div className="flex flex-col items-center justify-center w-full h-full">
+            <div className="flex items-center space-x-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <p>Loading data</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {!loading && (
+        <motion.div>
+          <DataTable
+            tableFilterBy={"ShiftGroup"}
+            columns={columns}
+            data={sortBy(schedules, ["Date", "ShiftGroup", "Name", "Time"])}
+          />
+        </motion.div>
       )}
-    />
+    </>
   );
 };
 

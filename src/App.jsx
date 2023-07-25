@@ -28,17 +28,16 @@ import {
 } from "./state/historicalFiles";
 import { useSchedules } from "./state/schedules";
 import { useTeachers } from "./state/teachers";
+import TeachersPage from "./pages/teachers";
+import AddTeacherModal from "./components/modals/teachers/add";
 
 const App = () => {
   const clearTeachers = useTeachers((state) => state.clearTeachers);
   const clearSchedules = useSchedules((state) => state.clearSchedules);
   const clearHistoricalFiles = useHistoricalFiles((state) => state.clearFiles);
   const clearFiles = () => {
-    const clearNames = clearHistoricalFiles();
-    const clearBlobs = clearFilesFromIndexedDB();
-
-    clearNames();
-    clearBlobs();
+    clearHistoricalFiles();
+    clearFilesFromIndexedDB();
   };
 
   const navigate = useNavigate();
@@ -57,13 +56,21 @@ const App = () => {
         <MenubarMenu>
           <MenubarTrigger>File</MenubarTrigger>
           <MenubarContent>
-            {/* <MenubarItem onClick={() => navigate("/teachers/addTeacher")}>
+            <MenubarItem onClick={() => navigate("/teachers/addTeacher")}>
               Add Teacher
             </MenubarItem>
-            <MenubarSeparator /> */}
+            <MenubarItem onClick={() => clearTeachers()}>
+              Clear Teachers
+            </MenubarItem>
+            <MenubarSeparator />
             <MenubarItem onClick={() => navigate("/upload")}>
               Add Schedules
             </MenubarItem>
+            <MenubarItem onClick={() => clearSchedules()}>
+              Clear Schedules
+            </MenubarItem>
+            <MenubarSeparator />
+            <MenubarItem onClick={() => clearFiles()}>Clear Files</MenubarItem>
             <MenubarSeparator />
             <MenubarItem
               onClick={() => {
@@ -72,7 +79,7 @@ const App = () => {
                 clearFiles();
               }}
             >
-              Clear Data
+              Clear All Data
             </MenubarItem>
           </MenubarContent>
         </MenubarMenu>
@@ -113,14 +120,14 @@ const App = () => {
 
         <Card className="w-full h-full overflow-hidden border-none shadow-none">
           <Routes>
-            {/* <Route exact path="/" element={<Dashboard />} />
+            {/* <Route exact path="/" element={<Dashboard />} /> */}
             <Route exact path="/teachers" element={<TeachersPage />}>
               <Route
                 exact
                 path="/teachers/addTeacher"
                 element={<AddTeacherModal />}
               />
-            </Route> */}
+            </Route>
             <Route exact path="/" element={<ShiftSchedulePage />}>
               <Route exact path="/upload" element={<UploadScheduleModal />} />
               <Route

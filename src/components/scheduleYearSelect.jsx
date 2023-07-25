@@ -18,14 +18,14 @@ const ScheduleYearSelect = () => {
     <Select
       onValueChange={(value) => {
         const date = parse(
-          `${format(Date.now(), "M")}/${format(Date.now(), "d")}/${value}`,
+          `${format(selectedDate, "M")}/${format(Date.now(), "d")}/${value}`,
           "M/d/yyyy",
           Date.now()
         );
         setSelectedDate(date);
       }}
     >
-      <SelectTrigger className="w-[180px]">
+      <SelectTrigger>
         <SelectValue placeholder={format(selectedDate, "yyyy")} />
       </SelectTrigger>
       <SelectContent>

@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@builder.io/partytown": "^0.8.0",
     "@hookform/resolvers": "^3.1.1",
     "@legendapp/state": "^1.4.0",
     "@radix-ui/react-accordion": "^1.1.2",
@@ -46,6 +47,7 @@
     "date-fns": "^2.30.0",
     "dexie": "^3.2.4",
     "exceljs": "^4.3.0",
+    "file-saver": "^2.0.5",
     "framer-motion": "^10.12.18",
     "idb-keyval": "^6.2.1",
     "lucide-react": "^0.259.0",

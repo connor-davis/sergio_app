@@ -34,6 +34,13 @@ const Sidebar = () => {
         <Button
           className="justify-start w-full"
           variant="ghost"
+          onClick={() => navigate("/teachers")}
+        >
+          <Users2 className="w-4 h-4 mr-2" /> Teachers
+        </Button>
+        <Button
+          className="justify-start w-full"
+          variant="ghost"
           onClick={() => navigate("/file-archive")}
         >
           <FileArchive className="w-4 h-4 mr-2" /> Archive

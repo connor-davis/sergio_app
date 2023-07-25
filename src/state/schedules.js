@@ -6,42 +6,26 @@ import { indexedDbStorage } from "./indexedDb";
 export const useSchedules = create(
   persist(
     (set, get) => ({
-      schedules: [],
-      lostSchedules: [],
-      addSchedule: (data) =>
-        set((state) => ({
-          schedules: [
-            ...state.schedules.filter(
-              (schedule) =>
-                schedule["Shift"] + schedule["Name"] !==
-                data["Shift"] + data["Name"]
-            ),
-            data,
-          ],
-        })),
-      removeSchedule: (shift) =>
-        set((state) => ({
-          schedules: state.schedules.filter(
-            (schedule) => schedule["Shift"] !== shift
-          ),
-        })),
-      addLostSchedule: (data) =>
-        set((state) => ({
-          lostSchedules: [
-            ...state.lostSchedules.filter(
-              (schedule) => schedule["Shift"] !== data["Shift"]
-            ),
-            data,
-          ],
-        })),
-      removeLostSchedule: (shift) =>
-        set((state) => ({
-          lostSchedules: state.lostSchedules.filter(
-            (schedule) => schedule["Shift"] !== shift
-          ),
-        })),
+      schedules: {},
+      lostSchedules: {},
+      addSchedules: (day, data) =>
+        set((state) => {
+          let schedules = state.schedules;
+
+          schedules[day] = data;
+
+          return { ...state, schedules };
+        }),
+      addLostSchedules: (day, data) =>
+        set((state) => {
+          let lostSchedules = state.lostSchedules;
+
+          lostSchedules[day] = data;
+
+          return { ...state, lostSchedules };
+        }),
       clearSchedules: () =>
-        set((state) => ({ schedules: [], lostSchedules: [] })),
+        set((state) => ({ schedules: {}, lostSchedules: {} })),
     }),
     {
       name: "schedules-storage",

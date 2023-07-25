@@ -26,6 +26,7 @@ import {
 } from "../../components/ui/tabs";
 import { exportSchedules, sortByDayNameTime } from "../../lib/utils";
 import { useSchedules } from "../../state/schedules";
+import { useTeachers } from "../../state/teachers";
 import { useTemp } from "../../state/temp";
 
 const ShiftSchedulePage = () => {
@@ -33,62 +34,73 @@ const ShiftSchedulePage = () => {
 
   const selectedDate = useTemp((state) => state.selectedDate);
 
-  const totalSchedules = useSchedules(
-    (state) =>
-      state.schedules.filter(
-        (schedule) =>
-          format(parse(schedule["Date"], "M/d/yyyy", Date.now()), "M/yyyy") ===
-          format(selectedDate, "M/yyyy")
-      ).length
+  const totalSchedules = useSchedules((state) =>
+    [...Object.keys(state.schedules)]
+      .map(
+        (day) =>
+          state.schedules[day].filter(
+            (schedule) =>
+              format(
+                parse(schedule["Date"], "M/d/yyyy", Date.now()),
+                "M/yyyy"
+              ) === format(selectedDate, "M/yyyy")
+          ).length
+      )
+      .reduce((previous, current) => previous + current, 0)
   );
-  const totalInternalPickups = useSchedules(
-    (state) =>
-      state.schedules
-        .filter(
-          (schedule) =>
-            format(
-              parse(schedule["Date"], "M/d/yyyy", Date.now()),
-              "M/yyyy"
-            ) === format(selectedDate, "M/yyyy")
-        )
-        .filter(
-          (shift) =>
-            shift["ShiftType"] && shift["ShiftType"] === "Internal Pickup"
-        ).length
+  const totalInternalPickups = useSchedules((state) =>
+    [...Object.keys(state.schedules)]
+      .map(
+        (day) =>
+          state.schedules[day].filter(
+            (schedule) =>
+              format(
+                parse(schedule["Date"], "M/d/yyyy", Date.now()),
+                "M/yyyy"
+              ) === format(selectedDate, "M/yyyy") &&
+              schedule["ShiftType"] &&
+              schedule["ShiftType"] === "Internal Pickup"
+          ).length
+      )
+      .reduce((previous, current) => previous + current, 0)
   );
-  const totalLostShifts = useSchedules(
-    (state) =>
-      state.lostSchedules.filter(
-        (schedule) =>
-          format(parse(schedule["Date"], "M/d/yyyy", Date.now()), "M/yyyy") ===
-          format(selectedDate, "M/yyyy")
-      ).length
+  const totalLostShifts = useSchedules((state) =>
+    [...Object.keys(state.lostSchedules)]
+      .map(
+        (day) =>
+          state.lostSchedules[day].filter(
+            (schedule) =>
+              format(
+                parse(schedule["Date"], "M/d/yyyy", Date.now()),
+                "M/yyyy"
+              ) === format(selectedDate, "M/yyyy")
+          ).length
+      )
+      .reduce((previous, current) => previous + current, 0)
   );
 
   const schedules = useSchedules((state) =>
-    state.schedules.filter(
-      (schedule) =>
-        format(parse(schedule["Date"], "M/d/yyyy", Date.now()), "M/yyyy") ===
-        format(selectedDate, "M/yyyy")
+    [...Object.keys(state.schedules)].map((day) =>
+      state.schedules[day].filter(
+        (schedule) =>
+          format(parse(schedule["Date"], "M/d/yyyy", Date.now()), "M/yyyy") ===
+          format(selectedDate, "M/yyyy")
+      )
     )
   );
   const lostSchedules = useSchedules((state) =>
-    state.lostSchedules.filter(
-      (schedule) =>
-        format(parse(schedule["Date"], "M/d/yyyy", Date.now()), "M/yyyy") ===
-        format(selectedDate, "M/yyyy")
+    [...Object.keys(state.lostSchedules)].map((day) =>
+      state.lostSchedules[day].filter(
+        (schedule) =>
+          format(parse(schedule["Date"], "M/d/yyyy", Date.now()), "M/yyyy") ===
+          format(selectedDate, "M/yyyy")
+      )
     )
   );
+  const teachers = useTeachers((state) => state.teachers);
 
   const exportData = () => {
-    exportSchedules(
-      sortByDayNameTime([
-        ...schedules,
-        ...lostSchedules.map((schedule) => {
-          return { ...schedule, ShiftType: "Dropped" };
-        }),
-      ])
-    );
+    console.log(schedules, lostSchedules);
   };
 
   return (
@@ -103,13 +115,26 @@ const ShiftSchedulePage = () => {
                 <HamburgerMenuIcon />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80"></PopoverContent>
+            <PopoverContent className="flex flex-col space-y-1 lg:flex-row w-80 lg:w-auto">
+              <ScheduleMonthSelect />
+              <ScheduleYearSelect />
+              <Button onClick={() => navigate("/upload")}>
+                <Upload className="w-4 h-4 mr-3" />
+                Upload Data
+              </Button>
+              <Button onClick={() => exportData()}>
+                <Download className="w-4 h-4 mr-3" />
+                Export Data
+              </Button>
+            </PopoverContent>
           </Popover>
         </div>
 
-        <div className="items-center hidden space-x-3 lg:flex">
-          <ScheduleMonthSelect />
-          <ScheduleYearSelect />
+        <div className="items-center hidden w-auto space-x-3 lg:flex">
+          <div className="flex w-auto space-x-3">
+            <ScheduleMonthSelect />
+            <ScheduleYearSelect />
+          </div>
           <Button onClick={() => navigate("/upload")}>
             <Upload className="w-4 h-4 mr-3" />
             Upload Data
@@ -126,7 +151,7 @@ const ShiftSchedulePage = () => {
           <div className="flex flex-row items-center space-x-4">
             <div>
               <p className="text-sm font-extrabold leading-4 uppercase">
-                Shifts
+                Total Shifts
               </p>
               <p className="inline-flex items-center space-x-2 text-2xl">
                 <span>{totalSchedules}</span>
@@ -139,7 +164,7 @@ const ShiftSchedulePage = () => {
           <div className="flex flex-row items-center space-x-4">
             <div>
               <p className="text-sm font-extrabold leading-4 uppercase">
-                Internal Pickups
+                Total Internal Pickups
               </p>
               <p className="inline-flex items-center space-x-2 text-2xl ">
                 <span>{totalInternalPickups}</span>
@@ -152,7 +177,7 @@ const ShiftSchedulePage = () => {
           <div className="flex flex-row items-center space-x-4">
             <div>
               <p className="text-sm font-extrabold leading-4 uppercase">
-                Lost Shifts
+                Total Lost Shifts
               </p>
               <p className="inline-flex items-center space-x-2 text-2xl ">
                 <span>{totalLostShifts}</span>
@@ -189,7 +214,15 @@ const ShiftSchedulePage = () => {
                 <CardHeader className="px-0 pt-0 pb-2 lg:py-5">
                   <div className="flex items-center justify-between">
                     <CardTitle>Schedule for day {index + 1}</CardTitle>
-                    <Button onClick={() => navigate("/process/" + (index + 1))}>
+                    <Button
+                      onClick={() =>
+                        navigate(
+                          `/process/${format(selectedDate, "M")}-${
+                            index + 1
+                          }-${format(selectedDate, "yyyy")}`
+                        )
+                      }
+                    >
                       Process Day
                     </Button>
                   </div>

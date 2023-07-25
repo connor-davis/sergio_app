@@ -19,7 +19,7 @@ const ScheduleMonthSelect = () => {
       onValueChange={(value) => {
         const date = parse(
           `${value.toLocaleLowerCase()}/${format(Date.now(), "d")}/${format(
-            Date.now(),
+            selectedDate,
             "yyyy"
           )}`,
           "MMMM/d/yyyy",
@@ -28,7 +28,7 @@ const ScheduleMonthSelect = () => {
         setSelectedDate(date);
       }}
     >
-      <SelectTrigger className="w-[180px]">
+      <SelectTrigger>
         <SelectValue placeholder={format(selectedDate, "MMMM")} />
       </SelectTrigger>
       <SelectContent>

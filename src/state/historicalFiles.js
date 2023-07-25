@@ -48,13 +48,7 @@ export const useHistoricalFiles = create(
       files: [],
       addFile: (filename, file) =>
         set((state) => {
-          saveFileToIndexedDB(file)
-            .then(() => {
-              console.log("File saved to IndexedDB.");
-            })
-            .catch((error) => {
-              console.error("Error saving file to IndexedDB:", error);
-            });
+          saveFileToIndexedDB(file);
 
           return {
             files: [

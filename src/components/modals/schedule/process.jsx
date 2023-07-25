@@ -1,11 +1,13 @@
 import { format, parse, subDays } from "date-fns";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { usePapaParse } from "react-papaparse";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   consolidateData,
   processDialogueData,
+  processInvoicingReportData,
+  sortBy,
   sortByDayNameTime,
 } from "../../../lib/utils";
 import {
@@ -13,6 +15,7 @@ import {
   useHistoricalFiles,
 } from "../../../state/historicalFiles";
 import { useSchedules } from "../../../state/schedules";
+import { useTeachers } from "../../../state/teachers";
 import {
   Dialog,
   DialogContent,
@@ -20,9 +23,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../ui/dialog";
+import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Progress } from "../../ui/progress";
 import { useToast } from "../../ui/use-toast";
+import { Button } from "../../ui/button";
 
 const ProcessScheduleModal = () => {
   const navigate = useNavigate();
@@ -32,8 +37,16 @@ const ProcessScheduleModal = () => {
 
   const { readString } = usePapaParse();
 
-  const addSchedule = useSchedules((state) => state.addSchedule);
-  const addLostSchedule = useSchedules((state) => state.addLostSchedule);
+  const schedulesList = useSchedules((state) => state.schedules);
+  const addSchedules = useSchedules((state) => state.addSchedules);
+
+  const lostSchedulesList = useSchedules((state) => state.lostSchedules);
+  const addLostSchedules = useSchedules((state) => state.addLostSchedules);
+
+  const teachersList = useTeachers((state) => state.teachers);
+  const setTeachers = useTeachers((state) => state.setTeachers);
+
+  const [invoicingReportData, setInvoicingReportData] = useState(false);
 
   const [dataProcessingBusy, setDataProcessingBusy] = useState(false);
   const [dataProcessingMessage, setDataProcessingMessage] = useState(undefined);
@@ -42,163 +55,190 @@ const ProcessScheduleModal = () => {
 
   const files = useHistoricalFiles((state) => state.files);
 
-  useEffect(() => {
-    const i = setTimeout(() => {
+  const handleUpload = (event) => {
+    setDataProcessingBusy(true);
+    setDataProcessingMessage("Reading invoicing report");
+    setDataProcessingProgress(undefined);
+
+    const file = event.target.files[0];
+
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const fileString = event.target.result;
+
+      readString(fileString, {
+        worker: true,
+        header: true,
+        complete: (result) => {
+          processInvoicingReportData(
+            result,
+            day,
+            setDataProcessingMessage,
+            setDataProcessingProgress,
+            (data) => {
+              setDataProcessingBusy(false);
+              setDataProcessingMessage(undefined);
+              setDataProcessingProgress(undefined);
+
+              setTeachers(sortBy(data, ["teacherName"]));
+
+              setInvoicingReportData(true);
+            }
+          );
+        },
+      });
+    };
+
+    reader.readAsText(file);
+  };
+
+  const beginDataProcessing = () => {
+    setDataProcessingBusy(true);
+
+    const fileDays = files
+      .map((name) => [
+        format(
+          parse(
+            name.split("II-")[1].replace(".xlsx", ""),
+            "yyyy-MM-dd-hh-mm-ss",
+            Date.now()
+          ),
+          "M-d-yyyy"
+        ),
+        format(
+          subDays(
+            parse(
+              name.split("II-")[1].replace(".xlsx", ""),
+              "yyyy-MM-dd-hh-mm-ss",
+              Date.now()
+            ),
+            6
+          ),
+          "M-d-yyyy"
+        ),
+      ])
+      .filter(
+        (fileDay) => fileDay[0] === day // This ensures that we are working with the selected days shifts and the original shifts for the selected day.
+      )[0];
+
+    const firstDay = fileDays[1];
+    const secondDay = fileDays[0];
+
+    const appropriateFiles = files.filter(
+      (name) =>
+        format(
+          parse(
+            name.split("II-")[1].replace(".xlsx", ""),
+            "yyyy-MM-dd-hh-mm-ss",
+            Date.now()
+          ),
+          "M-d-yyyy"
+        ) === firstDay ||
+        format(
+          parse(
+            name.split("II-")[1].replace(".xlsx", ""),
+            "yyyy-MM-dd-hh-mm-ss",
+            Date.now()
+          ),
+          "M-d-yyyy"
+        ) === secondDay
+    );
+    const numFiles = appropriateFiles.length;
+
+    if (numFiles > 1) {
       setDataProcessingBusy(true);
 
-      const fileDays = files
-        .map((name) => [
-          format(
-            parse(
-              name.split("II-")[1].replace(".xlsx", ""),
-              "yyyy-MM-dd-hh-mm-ss",
-              Date.now()
-            ),
-            "d"
-          ),
-          format(
-            subDays(
-              parse(
-                name.split("II-")[1].replace(".xlsx", ""),
-                "yyyy-MM-dd-hh-mm-ss",
-                Date.now()
-              ),
-              6
-            ),
-            "d"
-          ),
-        ])
-        .filter(
-          (fileDay) => fileDay[0] === day // This ensures that we are working with the selected days shifts and the original shifts for the selected day.
-        )[0];
-
-      const firstDay = fileDays[1];
-      const secondDay = fileDays[0];
-
-      const appropriateFiles = files.filter(
-        (name) =>
-          format(
-            parse(
-              name.split("II-")[1].replace(".xlsx", ""),
-              "yyyy-MM-dd-hh-mm-ss",
-              Date.now()
-            ),
-            "d"
-          ) === firstDay ||
-          format(
-            parse(
-              name.split("II-")[1].replace(".xlsx", ""),
-              "yyyy-MM-dd-hh-mm-ss",
-              Date.now()
-            ),
-            "d"
-          ) === secondDay
+      setDataProcessingMessage(undefined);
+      setTimeout(
+        () => setDataProcessingMessage("Processing " + numFiles + " files."),
+        100
       );
-      const numFiles = appropriateFiles.length;
+      setDataProcessingProgress(0);
 
-      if (numFiles > 1) {
-        setDataProcessingBusy(true);
+      let dataset = [];
 
-        setDataProcessingMessage(undefined);
-        setTimeout(
-          () => setDataProcessingMessage("Processing " + numFiles + " files."),
-          100
-        );
-        setDataProcessingProgress(0);
+      for (let fileIndex = 0; fileIndex < numFiles; fileIndex++) {
+        setTimeout(async () => {
+          processDialogueData(
+            await readFileFromIndexedDB(appropriateFiles[fileIndex]),
+            day,
+            setDataProcessingMessage,
+            setDataProcessingProgress,
+            (data) => {
+              dataset.push(data);
 
-        let dataset = [];
+              setDataProcessingMessage(undefined);
 
-        for (let fileIndex = 0; fileIndex < numFiles; fileIndex++) {
-          setTimeout(async () => {
-            processDialogueData(
-              await readFileFromIndexedDB(appropriateFiles[fileIndex]),
-              setDataProcessingMessage,
-              setDataProcessingProgress,
-              (data) => {
-                dataset.push(sortByDayNameTime(data));
+              setTimeout(
+                () =>
+                  setDataProcessingMessage(
+                    "Processed " + (fileIndex + 1) + "/" + numFiles + " files."
+                  ),
+                100
+              );
+              setDataProcessingProgress(
+                Math.ceil(((fileIndex + 1) / numFiles) * 100)
+              );
 
-                setDataProcessingMessage(undefined);
+              setTimeout(() => {
+                if (fileIndex + 1 === numFiles) {
+                  setDataProcessingProgress(undefined);
 
-                setTimeout(
-                  () =>
-                    setDataProcessingMessage(
-                      "Processed " +
-                        (fileIndex + 1) +
-                        "/" +
-                        numFiles +
-                        " files."
-                    ),
-                  100
-                );
-                setDataProcessingProgress(
-                  Math.ceil(((fileIndex + 1) / numFiles) * 100)
-                );
+                  setDataProcessingMessage(undefined);
+                  setTimeout(
+                    () =>
+                      setDataProcessingMessage(
+                        "Consolidating data between days."
+                      ),
+                    100
+                  );
 
-                setTimeout(() => {
-                  if (fileIndex + 1 === numFiles) {
-                    setDataProcessingProgress(undefined);
+                  dataset[0] = dataset[0].filter(
+                    (data) =>
+                      format(
+                        parse(data["Date"], "M/d/yyyy", Date.now()),
+                        "M-d-yyyy"
+                      ) === day
+                  );
 
-                    setDataProcessingMessage(undefined);
-                    setTimeout(
-                      () =>
-                        setDataProcessingMessage(
-                          "Consolidating data between days."
-                        ),
-                      100
-                    );
+                  dataset[1] = dataset[1].filter(
+                    (data) =>
+                      format(
+                        parse(data["Date"], "M/d/yyyy", Date.now()),
+                        "M-d-yyyy"
+                      ) === day
+                  );
 
-                    dataset[0] = dataset[0].filter(
-                      (data) =>
-                        format(
-                          parse(data["Date"], "M/d/yyyy", Date.now()),
-                          "d"
-                        ) === day
-                    );
+                  consolidateData(
+                    sortByDayNameTime(dataset[0]),
+                    sortByDayNameTime(dataset[1]),
+                    setDataProcessingMessage,
+                    setDataProcessingProgress,
+                    (schedules, lostSchedules) => {
+                      addSchedules(day, schedules);
+                      addLostSchedules(day, lostSchedules);
 
-                    dataset[1] = dataset[1].filter(
-                      (data) =>
-                        parseInt(
-                          format(
-                            parse(data["Date"], "M/d/yyyy", Date.now()),
-                            "d"
-                          )
-                        ) === parseInt(day)
-                    );
+                      setDataProcessingBusy(false);
+                      setDataProcessingMessage(undefined);
+                      setDataProcessingProgress(undefined);
 
-                    consolidateData(
-                      sortByDayNameTime(dataset[0]),
-                      sortByDayNameTime(dataset[1]),
-                      setDataProcessingMessage,
-                      setDataProcessingProgress,
-                      (schedules, lostSchedules) => {
-                        schedules.map(addSchedule);
-                        lostSchedules.map(addLostSchedule);
-
-                        setDataProcessingBusy(false);
-                        setDataProcessingMessage(undefined);
-                        setDataProcessingProgress(undefined);
-
-                        navigate("/");
-                      }
-                    );
-                  }
-                });
-              }
-            );
-          }, 1000 * fileIndex);
-        }
-      } else {
-        setDataProcessingBusy(false);
-        setDataProcessingMessage(
-          "Please ensure that you have the selected days dialogue data uploaded and the dialogue data from 6 days before the selected day uploaded."
-        );
+                      navigate("/");
+                    }
+                  );
+                }
+              });
+            }
+          );
+        }, 1000 * fileIndex);
       }
-    });
-
-    return () => {
-      clearTimeout(i);
-    };
-  }, []);
+    } else {
+      setDataProcessingBusy(false);
+      setDataProcessingMessage(
+        "Please ensure that you have the selected days dialogue data uploaded and the dialogue data from 6 days before the selected day uploaded."
+      );
+    }
+  };
 
   return (
     <Dialog
@@ -209,27 +249,70 @@ const ProcessScheduleModal = () => {
         }
       }}
     >
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Day {day}</DialogTitle>
-          <DialogDescription>
-            Please wait while data is being processed.
-          </DialogDescription>
-        </DialogHeader>
+      {!invoicingReportData && (
+        <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Invoicing Report</DialogTitle>
+              <DialogDescription>
+                Please provide the latest invoicing report.
+              </DialogDescription>
+            </DialogHeader>
 
-        {(dataProcessingProgress || dataProcessingMessage) && (
-          <div className="flex flex-col space-y-2">
-            {dataProcessingMessage !== undefined && (
-              <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }}>
+            {!dataProcessingBusy && (
+              <Input
+                id="csv"
+                type="file"
+                accept=".csv"
+                onChange={handleUpload}
+              />
+            )}
+
+            {dataProcessingBusy && (
+              <div className="flex flex-col space-y-2">
                 <Label>{dataProcessingMessage}</Label>
-              </motion.div>
+                <Progress value={dataProcessingProgress} />
+              </div>
             )}
-            {dataProcessingProgress !== undefined && (
-              <Progress value={dataProcessingProgress} />
+          </DialogContent>
+        </motion.div>
+      )}
+
+      {invoicingReportData && (
+        <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Day {day}</DialogTitle>
+              <DialogDescription>
+                Please wait while data is being processed.
+              </DialogDescription>
+            </DialogHeader>
+
+            {dataProcessingBusy && (
+              <div className="flex flex-col space-y-2">
+                {dataProcessingMessage !== undefined && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                  >
+                    <Label>{dataProcessingMessage}</Label>
+                  </motion.div>
+                )}
+                {dataProcessingProgress !== undefined && (
+                  <Progress value={dataProcessingProgress} />
+                )}
+              </div>
             )}
-          </div>
-        )}
-      </DialogContent>
+
+            <Button
+              disabled={dataProcessingBusy}
+              onClick={() => beginDataProcessing()}
+            >
+              Process Data
+            </Button>
+          </DialogContent>
+        </motion.div>
+      )}
     </Dialog>
   );
 };
