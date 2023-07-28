@@ -15,9 +15,6 @@ self.addEventListener("message", (event) => {
       Invoices = [...Invoices, ...teacher["Invoices"]];
     });
 
-    console.log(Schedules);
-    console.log(Invoices);
-
     Schedules = [
       ...new Map(
         Schedules.map((Schedule) => [

@@ -94,17 +94,14 @@ const TeachersPage = () => {
     },
   ];
 
-  useEffect(() => {
-    const t = setTimeout(() => {
-      console.log(teachers);
-    });
-
-    return () => clearTimeout(t);
-  }, [teachers]);
-
   return (
     <ScrollArea className="p-3">
-      <Label className="text-lg font-semibold">Teachers</Label>
+      <div className="flex flex-col space-y-2">
+        <Label className="text-lg font-semibold">Teachers</Label>
+        <Label className="font-light">
+          Total of {teachers.length} teachers.
+        </Label>
+      </div>
 
       <div className="mt-3">
         <DataTable

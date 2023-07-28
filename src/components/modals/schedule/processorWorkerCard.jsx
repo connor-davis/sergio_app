@@ -53,18 +53,6 @@ const ProcessorWorkerCard = ({ data = [], onComplete = () => {} }) => {
     }
   }, [response]);
 
-  useEffect(() => {
-    if (mutateSchedulesResponse) {
-      console.log(mutateSchedulesResponse);
-    }
-  }, [mutateSchedulesResponse]);
-
-  useEffect(() => {
-    if (mutateTeachersResponse) {
-      console.log(mutateTeachersResponse);
-    }
-  }, [mutateTeachersResponse]);
-
   return (
     <Card className="border-none shadow-none">
       {error && (

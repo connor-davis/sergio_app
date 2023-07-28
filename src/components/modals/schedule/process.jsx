@@ -20,8 +20,6 @@ const ProcessScheduleModal = () => {
 
   const { toast } = useToast();
 
-  const { readString } = usePapaParse();
-
   const [errorMessage, setErrorMessage] = useState(undefined);
 
   const [dataProcessingBusy, setDataProcessingBusy] = useState(false);
@@ -108,51 +106,6 @@ const ProcessScheduleModal = () => {
 
       reader.readAsArrayBuffer(file);
     }
-  };
-
-  const processData = () => {
-    const dialogBob = new Blob([selectedDayDialogue]);
-    const secondaryDialogBob = new Blob([selectedDaySecondaryDialogue]);
-    const invoicingBlob = new Blob([latestInvoicingReport]);
-
-    setDataProcessingBusy(true);
-    setDataProcessingMessage(undefined);
-    setDataProcessingProgress(undefined);
-
-    useWorker(
-      "dialogInvoicingProcessorWorker",
-      [dialogBob, secondaryDialogBob, invoicingBlob, day],
-      (response) => {
-        const { type, data } = response;
-
-        switch (type) {
-          case "message":
-            setDataProcessingMessage(data);
-            break;
-          case "progress":
-            setDataProcessingProgress(data);
-            break;
-          case "data":
-            console.log(data);
-
-            setDataProcessingBusy(false);
-            setDataProcessingMessage(undefined);
-            setDataProcessingProgress(undefined);
-
-            navigate("/");
-            break;
-          case "error":
-            setDataProcessingBusy(false);
-            setDataProcessingMessage(undefined);
-            setDataProcessingProgress(undefined);
-
-            setErrorMessage(data);
-            break;
-          default:
-            break;
-        }
-      }
-    );
   };
 
   return (

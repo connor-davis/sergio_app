@@ -553,19 +553,6 @@ self.addEventListener("message", async (event) => {
 
     processedGroups = [...new Set(processedGroups)];
 
-    console.log([
-      processedTeachers,
-      processedGroups,
-      processedSchedules,
-      processedInvoices,
-      {
-        Teachers: processedTeachers.length,
-        Groups: processedGroups.length,
-        Schedules: processedSchedules.length,
-        Invoices: processedInvoices.length,
-      },
-    ]);
-
     postMessage({
       type: "data",
       data: [

@@ -328,62 +328,6 @@ export const consolidateData = (
   );
 };
 
-export const consolidatedSheet = (
-  schedules = [],
-  selectedDate = Date.now()
-) => {
-  let allSchedules = [];
-
-  schedules.map((schedules) =>
-    schedules.map((schedule) => allSchedules.push(schedule))
-  );
-
-  console.log(sortBy(allSchedules, ["Date", "ShiftGroup", "Name", "Time"]));
-
-  // const workbook = XLSX.utils.book_new();
-
-  // console.log(workbook);
-
-  // Array(getDaysInMonth(selectedDate))
-  //   .fill(null)
-  //   .map((_, index) => {
-  //     return {
-  //       day: index + 1,
-  //       schedules: sortBy(
-  //         schedules.filter(
-  //           (schedule) => parseInt(schedule["Day"]) === index + 1
-  //         ),
-  //         ["Date", "ShiftGroup", "Name", "Time"]
-  //       ),
-  //     };
-  //   })
-  //   .map(({ schedules, day }, index, array) => {
-  //     console.log(schedules);
-
-  //     const worksheet = XLSX.utils.json_to_sheet(schedules);
-
-  //     XLSX.utils.book_append_sheet(
-  //       workbook,
-  //       worksheet,
-  //       `${format(selectedDate, "M")}-${day}-${format(selectedDate, "yyyy")}`
-  //     );
-
-  //     console.log(index + 1, array.length);
-
-  //     if (index + 1 === array.length) {
-  //       console.log(workbook);
-
-  //       XLSX.writeFile(
-  //         workbook,
-  //         "AutomaticReport-Consolidated-Data-" +
-  //           format(Date.now(), "yyyy-MM-dd-hh-mm-ss") +
-  //           ".xlsx",
-  //         { cellStyles: true, bookType: "xlsx" }
-  //       );
-  //     }
-  //   });
-};
-
 export const exportEfficiencyTables = async (data) => {
   const workbook = XLSX.utils.book_new();
 
