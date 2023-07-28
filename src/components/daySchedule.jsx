@@ -1,7 +1,8 @@
-import { format, parse } from "date-fns";
+import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { ArrowUpDown, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useReactiveWorker } from "../hooks/useReactiveWorker";
 import { sortBy } from "../lib/utils";
 import { useSchedules } from "../state/schedules";
 import { useTemp } from "../state/temp";
@@ -10,48 +11,35 @@ import { Dialog, DialogContent } from "./ui/dialog";
 
 const DaySchedule = ({ day }) => {
   const selectedDate = useTemp((state) => state.selectedDate);
-  const schedules = useSchedules((state) =>
-    JSON.parse(
-      `[${[
-        ...Object.keys(state.schedules).filter(
-          (date) =>
-            format(parse(date, "M-d-yyyy", Date.now()), "M/d/yyyy") ===
-            `${format(selectedDate, "M")}/${day}/${format(
-              selectedDate,
-              "yyyy"
-            )}`
-        ),
-      ]
-        .map((day) => state.schedules[day])
-        .map((schedule) =>
-          JSON.stringify(schedule).replace("[", "").replace("]", "")
-        )
-        .join(",")}]`
-    )
-  );
+  const localSchedules = useSchedules((state) => state.schedules);
+
+  const [
+    daySchedules,
+    daySchedulesMessage,
+    daySchedulesProgress,
+    daySchedulesError,
+    setDaySchedulesWorkerData,
+  ] = useReactiveWorker("daySchedulesWorker", undefined);
+
+  useEffect(() => {
+    const disposableTimeout = setTimeout(() => {
+      if (localSchedules && localSchedules.length > 0) {
+        setDaySchedulesWorkerData({
+          schedules: localSchedules,
+          selectedDate:
+            format(selectedDate, "M") +
+            "-" +
+            day +
+            "-" +
+            format(selectedDate, "yyyy"),
+        });
+      }
+    });
+
+    return () => clearTimeout(disposableTimeout);
+  }, [localSchedules]);
 
   const columns = [
-    {
-      accessorKey: "ShiftGroup",
-      header: ({ column }) => (
-        <div
-          className="flex items-center px-1 space-x-2 cursor-pointer"
-          onClick={() =>
-            column.toggleSorting(
-              column.getIsSorted() ? column.getIsSorted() === "asc" : true
-            )
-          }
-        >
-          Group
-          <ArrowUpDown className="w-4 h-4 ml-2" />
-        </div>
-      ),
-      cell: ({ row }) => {
-        const Group = row.getValue("ShiftGroup");
-
-        return <div className="text-left">{Group}</div>;
-      },
-    },
     {
       accessorKey: "Name",
       header: ({ column }) => (
@@ -92,8 +80,29 @@ const DaySchedule = ({ day }) => {
       },
     },
     {
+      accessorKey: "ShiftGroup",
+      header: ({ column }) => (
+        <div
+          className="flex items-center px-1 space-x-2 cursor-pointer"
+          onClick={() =>
+            column.toggleSorting(
+              column.getIsSorted() ? column.getIsSorted() === "asc" : true
+            )
+          }
+        >
+          Shift Group
+          <ArrowUpDown className="w-4 h-4 ml-2" />
+        </div>
+      ),
+      cell: ({ row }) => {
+        const Group = row.getValue("ShiftGroup");
+
+        return <div className="text-left">{Group}</div>;
+      },
+    },
+    {
       accessorKey: "ShiftType",
-      header: () => <div className="text-left">Pickup Type</div>,
+      header: () => <div className="text-left">Shift Type</div>,
       cell: ({ row }) => {
         const ShiftType = row.getValue("ShiftType");
 
@@ -110,7 +119,7 @@ const DaySchedule = ({ day }) => {
     });
 
     return () => clearTimeout(t);
-  }, [schedules]);
+  }, [daySchedules]);
 
   return (
     <>
@@ -130,7 +139,12 @@ const DaySchedule = ({ day }) => {
           <DataTable
             tableFilterBy={"ShiftGroup"}
             columns={columns}
-            data={sortBy(schedules, ["Date", "ShiftGroup", "Name", "Time"])}
+            data={sortBy(daySchedules || [], [
+              "Date",
+              "ShiftGroup",
+              "Name",
+              "Time",
+            ])}
           />
         </motion.div>
       )}

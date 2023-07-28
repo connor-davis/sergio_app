@@ -1,16 +1,34 @@
+// TODO: Make the table row builder more efficient.
+const Row = (cells = []) => {
+  let self = { cells };
+  return self;
+};
+
+// TODO: Make the table builder more efficient.
+const Table = (rows = []) => {
+  let self = { rows };
+
+  return self;
+};
+
+self.addEventListener("message", (event) => {});
+
 onmessage = (event) => {
-  const { schedules, lostSchedules, teachers } = event.data;
+  const teachers = event.data;
 
   let ShiftGroups = [];
 
-  schedules.map((schedules) =>
-    schedules.map((schedule) => ShiftGroups.push(schedule["ShiftGroup"]))
-  );
-  lostSchedules.map((schedules) =>
-    schedules.map((schedule) => ShiftGroups.push(schedule["ShiftGroup"]))
+  teachers.map(({ Schedules }) =>
+    Schedules.map((schedule) => ShiftGroups.push(schedule["ShiftGroup"]))
   );
 
-  ShiftGroups = [...new Set(ShiftGroups)];
+  ShiftGroups = [
+    ...new Set(
+      ShiftGroups.map((Group) =>
+        Group.split(" ")[0] === "Rotation" ? "Rotation" : Group
+      )
+    ),
+  ];
 
   let Tables = [];
 
@@ -34,39 +52,97 @@ onmessage = (event) => {
       data: Math.ceil(((index + 1) / ShiftGroups.length) * 100),
     });
 
-    const groupSchedules = JSON.parse(
-      `[${[...Object.keys(schedules)]
-        .map((day) => schedules[day])
-        .map((schedule) =>
-          JSON.stringify(schedule).replace("[", "").replace("]", "")
-        )
-        .join(",")}]`
-    ).filter((schedule) => schedule["ShiftGroup"] === group);
+    const GroupShifts = {};
 
-    const groupLostSchedules = JSON.parse(
-      `[${[...Object.keys(lostSchedules)]
-        .map((day) => lostSchedules[day])
-        .map((schedule) =>
-          JSON.stringify(schedule).replace("[", "").replace("]", "")
-        )
-        .join(",")}]`
-    ).filter((schedule) => schedule["ShiftGroup"] === group);
+    teachers.map((teacher) => {
+      teacher["Schedules"].map((schedule) => {
+        if (!GroupShifts[schedule["Shift"]])
+          GroupShifts[schedule["Shift"]] = {
+            Invoices: [],
+            Schedules: [],
+          };
 
-    const groupTeachers = [
-      ...new Set(
-        [...groupSchedules, ...groupLostSchedules].map(
-          (schedule) => schedule["Name"]
-        )
-      ),
-    ];
+        GroupShifts[schedule["Shift"]]["Schedules"] = [
+          ...GroupShifts[schedule["Shift"]]["Schedules"],
+          schedule,
+        ];
+      });
 
-    const groupDays = [
-      ...new Set(
-        [...groupSchedules, ...groupLostSchedules].map(
-          (schedule) => schedule["Date"]
-        )
-      ),
-    ];
+      teacher["Invoices"].map((invoice) => {
+        if (!GroupShifts[invoice["Shift"]])
+          GroupShifts[invoice["Shift"]] = {
+            Invoices: [],
+            Schedules: [],
+          };
+
+        GroupShifts[invoice["Shift"]]["Invoices"] = [
+          ...GroupShifts[invoice["Shift"]]["Invoices"],
+          invoice,
+        ];
+      });
+    });
+
+    const GroupTeachers = [
+      ...new Set([
+        ...Object.keys(GroupShifts)
+          .map((groupShift) => {
+            const GroupShift = GroupShifts[groupShift];
+
+            return GroupShift["Schedules"]
+              .filter((Schedule) =>
+                Schedule["ShiftGroup"].split(" ")[0] === "Rotation"
+                  ? Schedule["ShiftGroup"].split(" ")[0] === group
+                  : Schedule["ShiftGroup"] === group
+              )
+              .map((Schedule) => Schedule["Name"])[0];
+          })
+          .filter((Teacher) => Teacher),
+        ...Object.keys(GroupShifts)
+          .map((groupShift) => {
+            const GroupShift = GroupShifts[groupShift];
+
+            return GroupShift["Invoices"]
+              .filter((Invoice) =>
+                GroupShift["Schedules"]
+                  .filter((Schedule) =>
+                    Schedule["ShiftGroup"].split(" ")[0] === "Rotation"
+                      ? Schedule["ShiftGroup"].split(" ")[0] === group
+                      : Schedule["ShiftGroup"] === group
+                  )
+                  .map((Schedule) => Schedule["Shift"])
+                  .includes(Invoice["Shift"])
+              )
+              .map((Schedule) => Schedule["Name"])[0];
+          })
+          .filter((Teacher) => Teacher),
+      ]),
+    ].sort((a, b) => {
+      if (a > b) return 1;
+      if (a < b) return -1;
+
+      return 0;
+    });
+
+    let groupDays = [];
+
+    teachers
+      .filter((teacher) => GroupTeachers.includes(teacher["Name"]))
+      .map((teacher) => {
+        groupDays = [
+          ...new Set([
+            ...groupDays,
+            ...teacher["Schedules"].map((schedule) => schedule["Date"]),
+          ]),
+        ].sort((a, b) => {
+          const aDay = a.split("-")[1];
+          const bDay = b.split("-")[1];
+
+          if (parseInt(aDay) > parseInt(bDay)) return 1;
+          if (parseInt(aDay) < parseInt(bDay)) return -1;
+
+          return 0;
+        });
+      });
 
     let headers = ["Tutor"];
     let rows = [];
@@ -81,59 +157,68 @@ onmessage = (event) => {
         headers.push("Variance");
       });
 
-    groupTeachers
-      .sort((a, b) => {
-        if (a > b) return 1;
-        if (a < b) return -1;
+    GroupTeachers.sort((a, b) => {
+      if (a > b) return 1;
+      if (a < b) return -1;
 
-        return 0;
-      })
-      .map((teacherName) => {
-        let teacherRow = [teacherName];
-        const teacherFound = teachers.filter(
-          (teacher) => teacher["TeacherName"] === teacherName
-        )[0];
+      return 0;
+    }).map((Name) => {
+      let teacherRow = [Name];
 
-        if (!teacherFound) {
-          Array(groupDays.length)
-            .fill(null)
-            .map((_, index) => {
-              teacherRow.push(" ");
-              teacherRow.push(0);
-              teacherRow.push(0);
-              teacherRow.push(0);
-              teacherRow.push(0);
-            });
-        } else {
+      teachers
+        .filter((teacher) => teacher["Name"] === Name)
+        .map((teacher) => {
+          const Schedules = teacher["Schedules"];
+          const Invoices = teacher["Invoices"];
+
+          const SchedulesGroup = [
+            ...new Set(Schedules.map((schedule) => schedule["ShiftGroup"])),
+          ][0];
+
+          if (
+            SchedulesGroup &&
+            SchedulesGroup.split(" ")[0] !== "Rotation" &&
+            SchedulesGroup !== group
+          ) {
+            teacherRow = undefined;
+            return;
+          }
+
           Array(groupDays.length)
             .fill(null)
             .map((_, index) => {
               let scheduled =
-                groupSchedules.filter(
-                  (schedule) =>
-                    schedule["Date"] === groupDays[index] &&
-                    schedule["Name"] === teacherName
+                Schedules.filter(
+                  (schedule) => schedule["Date"] === groupDays[index]
                 ).length * 2 || 0;
 
-              let taught = teacherFound.shifts
-                ? teacherFound.shifts.filter(
-                    (schedule) =>
-                      schedule["Date"].split(" ")[0] === groupDays[index]
+              let taught = Invoices
+                ? Invoices.filter(
+                    (invoice) =>
+                      invoice["Date"].split(" ")[0] === groupDays[index]
                   ).length
                 : 0;
 
-              let noShows = taught - scheduled < 0 ? -(taught - scheduled) : 0;
+              let noShows = Invoices
+                ? Invoices.filter(
+                    (invoice) =>
+                      invoice["Date"].split(" ")[0] === groupDays[index] &&
+                      !invoice["Eligible"]
+                  ).length
+                : 0;
+
+              const initialVariance = taught - scheduled;
 
               teacherRow.push(" ");
               teacherRow.push(scheduled);
               teacherRow.push(taught);
               teacherRow.push(noShows);
-              teacherRow.push(noShows === 0 ? taught - scheduled : -noShows);
+              teacherRow.push(initialVariance - noShows);
             });
-        }
+        });
 
-        rows.push(teacherRow);
-      });
+      if (teacherRow) rows.push(teacherRow);
+    });
 
     const varianceRow = ["Total"];
 
@@ -161,8 +246,6 @@ onmessage = (event) => {
       });
 
     const groupTable = [headers, ...rows, varianceRow];
-
-    console.log(groupTable);
 
     Tables.push([ShiftGroups[index], groupTable]);
   });

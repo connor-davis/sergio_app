@@ -25,7 +25,7 @@ const TeachersPage = () => {
 
   const columns = [
     {
-      accessorKey: "TeacherName",
+      accessorKey: "Name",
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -36,16 +36,34 @@ const TeachersPage = () => {
         </Button>
       ),
       cell: ({ row }) => {
-        const teacherName = row.getValue("TeacherName");
+        const teacherName = row.getValue("Name");
 
         return <div className="text-left">{teacherName}</div>;
+      },
+    },
+    {
+      accessorKey: "Schedules",
+      header: () => <div className="text-left">Schedules</div>,
+      cell: ({ row }) => {
+        const Schedules = row.getValue("Schedules");
+
+        return <div className="text-left">{Schedules.length}</div>;
+      },
+    },
+    {
+      accessorKey: "Invoices",
+      header: () => <div className="text-left">Invoices</div>,
+      cell: ({ row }) => {
+        const Invoices = row.getValue("Invoices");
+
+        return <div className="text-left">{Invoices.length}</div>;
       },
     },
     {
       accessorKey: "delete",
       header: () => <div></div>,
       cell: ({ row }) => {
-        const teacherName = row.getValue("TeacherName");
+        const teacherName = row.getValue("Name");
 
         return (
           <AlertDialog>
@@ -90,9 +108,9 @@ const TeachersPage = () => {
 
       <div className="mt-3">
         <DataTable
-          tableFilterBy="TeacherName"
+          tableFilterBy="Name"
           columns={columns}
-          data={sortBy(teachers, ["TeacherName"])}
+          data={sortBy(teachers, ["Name"])}
         />
       </div>
 

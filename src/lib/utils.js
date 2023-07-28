@@ -1,11 +1,23 @@
 import { clsx } from "clsx";
-import { compareAsc, format, parse } from "date-fns";
+import { compareAsc, format, getDaysInMonth, parse } from "date-fns";
 import ExcelJS from "exceljs";
 import { twMerge } from "tailwind-merge";
 import * as XLSX from "xlsx";
+import { useWorker } from "../hooks/useWorker";
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
+}
+
+export function getReadableFileSizeString(fileSizeInBytes) {
+  var i = -1;
+  var byteUnits = [" kB", " MB", " GB", " TB", "PB", "EB", "ZB", "YB"];
+  do {
+    fileSizeInBytes /= 1024;
+    i++;
+  } while (fileSizeInBytes > 1024);
+
+  return Math.max(fileSizeInBytes, 0.1).toFixed(1) + byteUnits[i];
 }
 
 export const sortBy = (rows, categories = []) => {
@@ -85,30 +97,27 @@ export const processInvoicingReportData = async (
   onProgress = (progress) => {},
   onComplete = (data) => {}
 ) => {
-  const worker = new Worker("/invoicingRowProcessorWorker.js");
+  useWorker(
+    "invoicingRowProcessorWorker",
+    { data, selectedDay },
+    (response) => {
+      const { type, data } = response;
 
-  worker.postMessage({
-    data,
-    selectedDay,
-  });
+      switch (type) {
+        case "progress":
+          onProgress(data);
+          break;
+        case "message":
+          onEvent(data);
+          break;
+        case "data":
+          onEvent("Processing complete.");
 
-  worker.onmessage = (event) => {
-    const message = event.data;
-
-    switch (message.type) {
-      case "progress":
-        onProgress(message.data);
-        break;
-      case "message":
-        onEvent(message.data);
-        break;
-      case "data":
-        onEvent("Processing complete.");
-
-        onComplete(message.data);
-        break;
+          onComplete(data);
+          break;
+      }
     }
-  };
+  );
 };
 
 export const processDialogueData = async (
@@ -319,41 +328,61 @@ export const consolidateData = (
   );
 };
 
-// const consolidatedSheet = (schedules = [], selectedDate = Date.now()) => {
-//   const workbook = XLSX.utils.book_new();
+export const consolidatedSheet = (
+  schedules = [],
+  selectedDate = Date.now()
+) => {
+  let allSchedules = [];
 
-//   Array(getDaysInMonth(selectedDate))
-//     .fill(null)
-//     .map((_, index) => {
-//       return {
-//         day: index + 1,
-//         schedules: sortBy(
-//           schedules.filter(
-//             (schedule) => parseInt(schedule["Day"]) === index + 1
-//           ),
-//           ["Date", "ShiftGroup", "Name", "Time"]
-//         ),
-//       };
-//     })
-//     .filter(({ schedules }) => schedules.length > 0)
-//     .map(({ schedules, day }) => {
-//       const worksheet = XLSX.utils.json_to_sheet(schedules);
+  schedules.map((schedules) =>
+    schedules.map((schedule) => allSchedules.push(schedule))
+  );
 
-//       XLSX.utils.book_append_sheet(
-//         workbook,
-//         worksheet,
-//         `${format(selectedDate, "M")}-${day}-${format(selectedDate, "yyyy")}`
-//       );
-//     });
+  console.log(sortBy(allSchedules, ["Date", "ShiftGroup", "Name", "Time"]));
 
-//   XLSX.writeFile(
-//     workbook,
-//     "AutomaticReport-Consolidated-Data-" +
-//       format(Date.now(), "yyyy-MM-dd-hh-mm-ss") +
-//       ".xlsx",
-//     { cellStyles: true, bookType: "xlsx" }
-//   );
-// };
+  // const workbook = XLSX.utils.book_new();
+
+  // console.log(workbook);
+
+  // Array(getDaysInMonth(selectedDate))
+  //   .fill(null)
+  //   .map((_, index) => {
+  //     return {
+  //       day: index + 1,
+  //       schedules: sortBy(
+  //         schedules.filter(
+  //           (schedule) => parseInt(schedule["Day"]) === index + 1
+  //         ),
+  //         ["Date", "ShiftGroup", "Name", "Time"]
+  //       ),
+  //     };
+  //   })
+  //   .map(({ schedules, day }, index, array) => {
+  //     console.log(schedules);
+
+  //     const worksheet = XLSX.utils.json_to_sheet(schedules);
+
+  //     XLSX.utils.book_append_sheet(
+  //       workbook,
+  //       worksheet,
+  //       `${format(selectedDate, "M")}-${day}-${format(selectedDate, "yyyy")}`
+  //     );
+
+  //     console.log(index + 1, array.length);
+
+  //     if (index + 1 === array.length) {
+  //       console.log(workbook);
+
+  //       XLSX.writeFile(
+  //         workbook,
+  //         "AutomaticReport-Consolidated-Data-" +
+  //           format(Date.now(), "yyyy-MM-dd-hh-mm-ss") +
+  //           ".xlsx",
+  //         { cellStyles: true, bookType: "xlsx" }
+  //       );
+  //     }
+  //   });
+};
 
 export const exportEfficiencyTables = async (data) => {
   const workbook = XLSX.utils.book_new();
@@ -364,9 +393,9 @@ export const exportEfficiencyTables = async (data) => {
     XLSX.utils.book_append_sheet(workbook, worksheet, groupTable[0]);
   });
 
-  XLSX.writeFile(
+  await XLSX.writeFile(
     workbook,
-    "AutomaticReport-Group-Efficencies" +
+    "AutomaticReport-Group-Efficencies-" +
       format(Date.now(), "yyyy-MM-dd-hh-mm-ss") +
       ".xlsx",
     { cellStyles: true, bookType: "xlsx" }

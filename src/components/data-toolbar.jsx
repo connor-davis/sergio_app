@@ -8,7 +8,7 @@ const DataToolbar = ({ filterBy = "ShiftGroup", table }) => {
         <Label htmlFor="filterBy">{filterBy}</Label>
         <Input
           id="filterBy"
-          placeholder={`Search for Shift with ${filterBy}`}
+          placeholder={`Search by ${filterBy}`}
           value={table.getColumn(filterBy).getFilterValue() ?? ""}
           onChange={(event) =>
             table.getColumn(filterBy).setFilterValue(event.target.value)

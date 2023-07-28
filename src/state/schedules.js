@@ -6,26 +6,9 @@ import { indexedDbStorage } from "./indexedDb";
 export const useSchedules = create(
   persist(
     (set, get) => ({
-      schedules: {},
-      lostSchedules: {},
-      addSchedules: (day, data) =>
-        set((state) => {
-          let schedules = state.schedules;
-
-          schedules[day] = data;
-
-          return { ...state, schedules };
-        }),
-      addLostSchedules: (day, data) =>
-        set((state) => {
-          let lostSchedules = state.lostSchedules;
-
-          lostSchedules[day] = data;
-
-          return { ...state, lostSchedules };
-        }),
-      clearSchedules: () =>
-        set((state) => ({ schedules: {}, lostSchedules: {} })),
+      schedules: [],
+      setSchedules: (schedules) => set((state) => ({ schedules })),
+      clearSchedules: () => set((state) => ({ schedules: [] })),
     }),
     {
       name: "schedules-storage",

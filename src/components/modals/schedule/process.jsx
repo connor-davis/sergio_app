@@ -1,33 +1,18 @@
-import { format, parse, subDays } from "date-fns";
+import { format, isSameDay, parse, subDays } from "date-fns";
 import { motion } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { usePapaParse } from "react-papaparse";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  consolidateData,
-  processDialogueData,
-  processInvoicingReportData,
-  sortBy,
-  sortByDayNameTime,
-} from "../../../lib/utils";
-import {
-  readFileFromIndexedDB,
-  useHistoricalFiles,
-} from "../../../state/historicalFiles";
-import { useSchedules } from "../../../state/schedules";
-import { useTeachers } from "../../../state/teachers";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "../../ui/dialog";
+import { useWorker } from "../../../hooks/useWorker";
+import { getReadableFileSizeString } from "../../../lib/utils";
+import { Button } from "../../ui/button";
+import { Card } from "../../ui/card";
+import { Dialog, DialogContent, DialogHeader } from "../../ui/dialog";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
-import { Progress } from "../../ui/progress";
 import { useToast } from "../../ui/use-toast";
-import { Button } from "../../ui/button";
+import ProcessorWorkerCard from "./processorWorkerCard";
 
 const ProcessScheduleModal = () => {
   const navigate = useNavigate();
@@ -37,207 +22,137 @@ const ProcessScheduleModal = () => {
 
   const { readString } = usePapaParse();
 
-  const schedulesList = useSchedules((state) => state.schedules);
-  const addSchedules = useSchedules((state) => state.addSchedules);
-
-  const lostSchedulesList = useSchedules((state) => state.lostSchedules);
-  const addLostSchedules = useSchedules((state) => state.addLostSchedules);
-
-  const teachersList = useTeachers((state) => state.teachers);
-  const setTeachers = useTeachers((state) => state.setTeachers);
-
-  const [invoicingReportData, setInvoicingReportData] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(undefined);
 
   const [dataProcessingBusy, setDataProcessingBusy] = useState(false);
   const [dataProcessingMessage, setDataProcessingMessage] = useState(undefined);
   const [dataProcessingProgress, setDataProcessingProgress] =
     useState(undefined);
 
-  const files = useHistoricalFiles((state) => state.files);
+  const [selectedDayDialogue, setSelectedDayDialogue] = useState(undefined); // Controls whether this component has the selected days dialogue or not.
+  const [selectedDaySecondaryDialogue, setSelectedDaySecondaryDialogue] =
+    useState(undefined); // Controls whether this component has the selected days dialogue or not.
+  const [latestInvoicingReport, setLatestInvoicingReport] = useState(undefined); // Controls whether this component has the latest invoicing report or not.
 
-  const handleUpload = (event) => {
-    setDataProcessingBusy(true);
-    setDataProcessingMessage("Reading invoicing report");
-    setDataProcessingProgress(undefined);
-
+  const handleDialogueFiles = (event) => {
     const file = event.target.files[0];
 
-    const reader = new FileReader();
+    if (file) {
+      const fileNameDatified = file.name
+        .replace("Dialogue Scheduled Shifts - II-", "")
+        .replace(".xlsx", "")
+        .replace(".csv", "");
 
-    reader.onload = (event) => {
-      const fileString = event.target.result;
+      if (
+        !isSameDay(
+          parse(fileNameDatified, "yyyy-MM-dd-hh-mm-ss", Date.now()),
+          parse(day, "M-d-yyyy", Date.now())
+        )
+      ) {
+        toast({
+          description: "Please upload the dialogue document for " + day,
+        });
+      } else {
+        const reader = new FileReader();
 
-      readString(fileString, {
-        worker: true,
-        header: true,
-        complete: (result) => {
-          processInvoicingReportData(
-            result,
-            day,
-            setDataProcessingMessage,
-            setDataProcessingProgress,
-            (data) => {
-              setDataProcessingBusy(false);
-              setDataProcessingMessage(undefined);
-              setDataProcessingProgress(undefined);
+        reader.onload = () => {
+          setSelectedDayDialogue(reader.result);
+        };
 
-              setTeachers(sortBy(data, ["teacherName"]));
-
-              setInvoicingReportData(true);
-            }
-          );
-        },
-      });
-    };
-
-    reader.readAsText(file);
+        reader.readAsArrayBuffer(file);
+      }
+    }
   };
 
-  const beginDataProcessing = () => {
-    setDataProcessingBusy(true);
+  const handleSecondaryDialogueFiles = (event) => {
+    const file = event.target.files[0];
 
-    const fileDays = files
-      .map((name) => [
-        format(
-          parse(
-            name.split("II-")[1].replace(".xlsx", ""),
-            "yyyy-MM-dd-hh-mm-ss",
-            Date.now()
-          ),
-          "M-d-yyyy"
-        ),
-        format(
-          subDays(
-            parse(
-              name.split("II-")[1].replace(".xlsx", ""),
-              "yyyy-MM-dd-hh-mm-ss",
-              Date.now()
-            ),
-            6
-          ),
-          "M-d-yyyy"
-        ),
-      ])
-      .filter(
-        (fileDay) => fileDay[0] === day // This ensures that we are working with the selected days shifts and the original shifts for the selected day.
-      )[0];
+    if (file) {
+      const fileNameDatified = file.name
+        .replace("Dialogue Scheduled Shifts - II-", "")
+        .replace(".xlsx", "")
+        .replace(".csv", "");
 
-    const firstDay = fileDays[1];
-    const secondDay = fileDays[0];
+      if (
+        !isSameDay(
+          parse(fileNameDatified, "yyyy-MM-dd-hh-mm-ss", Date.now()),
+          subDays(parse(day, "M-d-yyyy", Date.now()), 6)
+        )
+      ) {
+        toast({
+          description:
+            "Please upload the dialogue document for " +
+            format(subDays(parse(day, "M-d-yyyy", Date.now()), 6), "M-d-yyyy"),
+        });
+      } else {
+        const reader = new FileReader();
 
-    const appropriateFiles = files.filter(
-      (name) =>
-        format(
-          parse(
-            name.split("II-")[1].replace(".xlsx", ""),
-            "yyyy-MM-dd-hh-mm-ss",
-            Date.now()
-          ),
-          "M-d-yyyy"
-        ) === firstDay ||
-        format(
-          parse(
-            name.split("II-")[1].replace(".xlsx", ""),
-            "yyyy-MM-dd-hh-mm-ss",
-            Date.now()
-          ),
-          "M-d-yyyy"
-        ) === secondDay
-    );
-    const numFiles = appropriateFiles.length;
+        reader.onload = () => {
+          setSelectedDaySecondaryDialogue(reader.result);
+        };
 
-    if (numFiles > 1) {
-      setDataProcessingBusy(true);
-
-      setDataProcessingMessage(undefined);
-      setTimeout(
-        () => setDataProcessingMessage("Processing " + numFiles + " files."),
-        100
-      );
-      setDataProcessingProgress(0);
-
-      let dataset = [];
-
-      for (let fileIndex = 0; fileIndex < numFiles; fileIndex++) {
-        setTimeout(async () => {
-          processDialogueData(
-            await readFileFromIndexedDB(appropriateFiles[fileIndex]),
-            day,
-            setDataProcessingMessage,
-            setDataProcessingProgress,
-            (data) => {
-              dataset.push(data);
-
-              setDataProcessingMessage(undefined);
-
-              setTimeout(
-                () =>
-                  setDataProcessingMessage(
-                    "Processed " + (fileIndex + 1) + "/" + numFiles + " files."
-                  ),
-                100
-              );
-              setDataProcessingProgress(
-                Math.ceil(((fileIndex + 1) / numFiles) * 100)
-              );
-
-              setTimeout(() => {
-                if (fileIndex + 1 === numFiles) {
-                  setDataProcessingProgress(undefined);
-
-                  setDataProcessingMessage(undefined);
-                  setTimeout(
-                    () =>
-                      setDataProcessingMessage(
-                        "Consolidating data between days."
-                      ),
-                    100
-                  );
-
-                  dataset[0] = dataset[0].filter(
-                    (data) =>
-                      format(
-                        parse(data["Date"], "M/d/yyyy", Date.now()),
-                        "M-d-yyyy"
-                      ) === day
-                  );
-
-                  dataset[1] = dataset[1].filter(
-                    (data) =>
-                      format(
-                        parse(data["Date"], "M/d/yyyy", Date.now()),
-                        "M-d-yyyy"
-                      ) === day
-                  );
-
-                  consolidateData(
-                    sortByDayNameTime(dataset[0]),
-                    sortByDayNameTime(dataset[1]),
-                    setDataProcessingMessage,
-                    setDataProcessingProgress,
-                    (schedules, lostSchedules) => {
-                      addSchedules(day, schedules);
-                      addLostSchedules(day, lostSchedules);
-
-                      setDataProcessingBusy(false);
-                      setDataProcessingMessage(undefined);
-                      setDataProcessingProgress(undefined);
-
-                      navigate("/");
-                    }
-                  );
-                }
-              });
-            }
-          );
-        }, 1000 * fileIndex);
+        reader.readAsArrayBuffer(file);
       }
-    } else {
-      setDataProcessingBusy(false);
-      setDataProcessingMessage(
-        "Please ensure that you have the selected days dialogue data uploaded and the dialogue data from 6 days before the selected day uploaded."
-      );
     }
+  };
+
+  const handleInvoicingFile = (event) => {
+    const file = event.target.files[0];
+
+    if (file) {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        setLatestInvoicingReport(reader.result);
+      };
+
+      reader.readAsArrayBuffer(file);
+    }
+  };
+
+  const processData = () => {
+    const dialogBob = new Blob([selectedDayDialogue]);
+    const secondaryDialogBob = new Blob([selectedDaySecondaryDialogue]);
+    const invoicingBlob = new Blob([latestInvoicingReport]);
+
+    setDataProcessingBusy(true);
+    setDataProcessingMessage(undefined);
+    setDataProcessingProgress(undefined);
+
+    useWorker(
+      "dialogInvoicingProcessorWorker",
+      [dialogBob, secondaryDialogBob, invoicingBlob, day],
+      (response) => {
+        const { type, data } = response;
+
+        switch (type) {
+          case "message":
+            setDataProcessingMessage(data);
+            break;
+          case "progress":
+            setDataProcessingProgress(data);
+            break;
+          case "data":
+            console.log(data);
+
+            setDataProcessingBusy(false);
+            setDataProcessingMessage(undefined);
+            setDataProcessingProgress(undefined);
+
+            navigate("/");
+            break;
+          case "error":
+            setDataProcessingBusy(false);
+            setDataProcessingMessage(undefined);
+            setDataProcessingProgress(undefined);
+
+            setErrorMessage(data);
+            break;
+          default:
+            break;
+        }
+      }
+    );
   };
 
   return (
@@ -249,7 +164,132 @@ const ProcessScheduleModal = () => {
         }
       }}
     >
-      {!invoicingReportData && (
+      <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader></DialogHeader>
+          {errorMessage && (
+            <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }}>
+              <Label className="text-red-500">{errorMessage}</Label>
+            </motion.div>
+          )}
+
+          {!errorMessage && (
+            <>
+              {!selectedDayDialogue && (
+                <div className="flex flex-col space-y-2">
+                  <Label>{day}'s Dialogue Document</Label>
+                  <Input
+                    type="file"
+                    accept=".csv, .xlsx"
+                    onChange={handleDialogueFiles}
+                  />
+                </div>
+              )}
+              {!selectedDaySecondaryDialogue && (
+                <div className="flex flex-col space-y-2">
+                  <Label>
+                    {format(
+                      subDays(parse(day, "M-d-yyyy", Date.now()), 6),
+                      "M-d-yyyy"
+                    )}
+                    's Dialogue Document
+                  </Label>
+                  <Input
+                    type="file"
+                    accept=".csv, .xlsx"
+                    onChange={handleSecondaryDialogueFiles}
+                  />
+                </div>
+              )}
+              {!latestInvoicingReport && (
+                <div className="flex flex-col space-y-2">
+                  <Label>Latest Invoicing Report</Label>
+                  <Input
+                    type="file"
+                    accept=".csv, .xlsx"
+                    onChange={handleInvoicingFile}
+                  />
+                </div>
+              )}
+
+              {dataProcessingBusy && (
+                <ProcessorWorkerCard
+                  data={[
+                    new Blob([selectedDayDialogue]),
+                    new Blob([selectedDaySecondaryDialogue]),
+                    new Blob([latestInvoicingReport]),
+                    day,
+                  ]}
+                  onComplete={() => {
+                    setDataProcessingBusy(false);
+                    setDataProcessingMessage(undefined);
+                    setDataProcessingProgress(undefined);
+                    setSelectedDayDialogue(undefined);
+                    setSelectedDaySecondaryDialogue(undefined);
+                    setLatestInvoicingReport(undefined);
+                    setErrorMessage(undefined);
+                  }}
+                />
+              )}
+
+              {!dataProcessingBusy &&
+                selectedDayDialogue &&
+                selectedDaySecondaryDialogue &&
+                latestInvoicingReport && (
+                  <div className="flex flex-col space-y-2">
+                    <Card className="border-none shadow-none">
+                      {(!dataProcessingMessage || !dataProcessingProgress) && (
+                        <div className="flex flex-col space-y-2">
+                          <div className="flex items-center justify-between w-full">
+                            <div>1. Dialogue Data for {day}</div>
+                            <div className="font-bold">
+                              {getReadableFileSizeString(
+                                selectedDayDialogue.byteLength
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between w-full">
+                            <div>
+                              2. Dialogue Data for{" "}
+                              {format(
+                                subDays(parse(day, "M-d-yyyy", Date.now()), 6),
+                                "M-d-yyyy"
+                              )}
+                            </div>
+                            <div className="font-bold">
+                              {getReadableFileSizeString(
+                                selectedDaySecondaryDialogue.byteLength
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between w-full">
+                            <div>3. Invoicing Report</div>
+                            <div className="font-bold">
+                              {getReadableFileSizeString(
+                                latestInvoicingReport.byteLength
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </Card>
+
+                    <Button
+                      disabled={dataProcessingBusy}
+                      onClick={() => setDataProcessingBusy(true)}
+                    >
+                      {dataProcessingBusy && (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      )}
+                      Process Data
+                    </Button>
+                  </div>
+                )}
+            </>
+          )}
+        </DialogContent>
+      </motion.div>
+      {/* {!invoicingReportData && (
         <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
@@ -312,7 +352,7 @@ const ProcessScheduleModal = () => {
             </Button>
           </DialogContent>
         </motion.div>
-      )}
+      )} */}
     </Dialog>
   );
 };

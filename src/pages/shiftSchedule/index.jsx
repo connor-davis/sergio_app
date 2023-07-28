@@ -1,7 +1,7 @@
 import { HamburgerMenuIcon } from "@radix-ui/react-icons";
 import { format, getDaysInMonth, parse } from "date-fns";
 import { Download, Loader2, Upload } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import DaySchedule from "../../components/daySchedule";
 import ScheduleMonthSelect from "../../components/scheduleMonthSelect";
@@ -20,84 +20,60 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "../../components/ui/popover";
+import { Progress } from "../../components/ui/progress";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "../../components/ui/tabs";
-import { exportEfficiencyTables, sortBy } from "../../lib/utils";
+import {
+  consolidatedSheet,
+  exportEfficiencyTables,
+  sortBy,
+} from "../../lib/utils";
 import { useSchedules } from "../../state/schedules";
 import { useTeachers } from "../../state/teachers";
 import { useTemp } from "../../state/temp";
-import { Progress } from "../../components/ui/progress";
+import { useReactiveWorker } from "../../hooks/useReactiveWorker";
 
 const ShiftSchedulePage = () => {
   const navigate = useNavigate();
 
   const selectedDate = useTemp((state) => state.selectedDate);
 
-  const totalSchedules = useSchedules((state) =>
-    [...Object.keys(state.schedules)]
-      .map(
-        (day) =>
-          state.schedules[day].filter(
-            (schedule) =>
-              format(
-                parse(schedule["Date"], "M/d/yyyy", Date.now()),
-                "M/yyyy"
-              ) === format(selectedDate, "M/yyyy")
-          ).length
-      )
-      .reduce((previous, current) => previous + current, 0)
+  const totalSchedules = useSchedules(
+    (state) =>
+      state.schedules.filter(
+        (schedule) =>
+          format(parse(schedule["Date"], "M-d-yyyy", Date.now()), "M-yyyy") ===
+          format(selectedDate, "M-yyyy")
+      ).length
   );
-  const totalInternalPickups = useSchedules((state) =>
-    [...Object.keys(state.schedules)]
-      .map(
-        (day) =>
-          state.schedules[day].filter(
-            (schedule) =>
-              format(
-                parse(schedule["Date"], "M/d/yyyy", Date.now()),
-                "M/yyyy"
-              ) === format(selectedDate, "M/yyyy") &&
-              schedule["ShiftType"] &&
-              schedule["ShiftType"] === "Internal Pickup"
-          ).length
-      )
-      .reduce((previous, current) => previous + current, 0)
+  const totalInternalPickups = useSchedules(
+    (state) =>
+      state.schedules.filter(
+        (schedule) =>
+          format(parse(schedule["Date"], "M-d-yyyy", Date.now()), "M-yyyy") ===
+            format(selectedDate, "M-yyyy") &&
+          schedule["ShiftType"] === "Internal Pickup"
+      ).length
   );
-  const totalLostShifts = useSchedules((state) =>
-    [...Object.keys(state.lostSchedules)]
-      .map(
-        (day) =>
-          state.lostSchedules[day].filter(
-            (schedule) =>
-              format(
-                parse(schedule["Date"], "M/d/yyyy", Date.now()),
-                "M/yyyy"
-              ) === format(selectedDate, "M/yyyy")
-          ).length
-      )
-      .reduce((previous, current) => previous + current, 0)
+  const totalLostShifts = useSchedules(
+    (state) =>
+      state.schedules.filter(
+        (schedule) =>
+          format(parse(schedule["Date"], "M-d-yyyy", Date.now()), "M-yyyy") ===
+            format(selectedDate, "M-yyyy") &&
+          schedule["ShiftType"] === "Dropped"
+      ).length
   );
 
   const schedules = useSchedules((state) =>
-    [...Object.keys(state.schedules)].map((day) =>
-      state.schedules[day].filter(
-        (schedule) =>
-          format(parse(schedule["Date"], "M/d/yyyy", Date.now()), "M/yyyy") ===
-          format(selectedDate, "M/yyyy")
-      )
-    )
-  );
-  const lostSchedules = useSchedules((state) =>
-    [...Object.keys(state.lostSchedules)].map((day) =>
-      state.lostSchedules[day].filter(
-        (schedule) =>
-          format(parse(schedule["Date"], "M/d/yyyy", Date.now()), "M/yyyy") ===
-          format(selectedDate, "M/yyyy")
-      )
+    state.schedules.filter(
+      (schedule) =>
+        format(parse(schedule["Date"], "M-d-yyyy", Date.now()), "M-yyyy") ===
+        format(selectedDate, "M-yyyy")
     )
   );
   const teachers = useTeachers((state) => state.teachers);
@@ -106,48 +82,36 @@ const ShiftSchedulePage = () => {
   const [dataExportMessage, setDataExportMessage] = useState(undefined);
   const [dataExportProgress, setDataExportProgress] = useState(undefined);
 
+  const [response, message, progress, error, setWorkerData] = useReactiveWorker(
+    "tutorEfficiencyBuilderWorker"
+  );
+
   const exportData = () => {
     setExportingData(true);
 
-    const worker = new Worker("/tutorEfficiencyBuilderWorker.js");
+    // consolidatedSheet(...schedules, selectedDate);
 
-    worker.postMessage({
-      schedules: schedules.map((schedules) =>
-        sortBy(schedules, ["ShiftGroup", "Date", "Name", "Time"])
-      ),
-      lostSchedules: lostSchedules.map((schedules) =>
-        sortBy(schedules, ["ShiftGroup", "Date", "Name", "Time"])
-      ),
-      teachers: sortBy(teachers, ["teacherName"]),
+    setWorkerData(sortBy(teachers, ["Name"]));
+  };
+
+  useEffect(() => {
+    const disposableTimeout = setTimeout(async () => {
+      if (response) {
+        await exportEfficiencyTables(response);
+
+        setExportingData(false);
+      }
     });
 
-    worker.onmessage = (event) => {
-      const { type, data } = event.data;
-
-      switch (type) {
-        case "message":
-          setDataExportMessage(data);
-          break;
-        case "progress":
-          setDataExportProgress(data);
-          break;
-        case "data":
-          exportEfficiencyTables(data);
-
-          setExportingData(false);
-          setDataExportMessage(undefined);
-          setDataExportProgress(undefined);
-          break;
-      }
-    };
-  };
+    return () => clearTimeout(disposableTimeout);
+  }, [response]);
 
   return (
     <>
       <Dialog open={exportingData}>
         <DialogContent className="sm:max-w-[425px]">
           <div className="flex flex-col items-center justify-center w-full h-full">
-            {!dataExportMessage && !dataExportProgress && (
+            {!message && !progress && (
               <div className="flex items-center space-x-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <p>Generating report.</p>
@@ -155,8 +119,8 @@ const ShiftSchedulePage = () => {
             )}
 
             <div className="flex flex-col w-full space-y-2 text-center">
-              {dataExportMessage && <Label>{dataExportMessage}</Label>}
-              {dataExportProgress && <Progress value={dataExportProgress} />}
+              {message && <Label>{message}</Label>}
+              {progress && <Progress value={progress} />}
             </div>
           </div>
         </DialogContent>

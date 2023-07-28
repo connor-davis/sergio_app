@@ -1,5 +1,8 @@
 onmessage = (event) => {
   let { data } = event.data;
+
+  console.log(data);
+
   postMessage({
     type: "message",
     data: `Processing ${data.length} rows.`,
