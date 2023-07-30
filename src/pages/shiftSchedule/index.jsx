@@ -1,6 +1,6 @@
 import { HamburgerMenuIcon } from "@radix-ui/react-icons";
 import { format, getDaysInMonth, parse } from "date-fns";
-import { Download, Loader2, Upload } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import DaySchedule from "../../components/daySchedule";
@@ -27,15 +27,11 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/tabs";
-import {
-  consolidatedSheet,
-  exportEfficiencyTables,
-  sortBy,
-} from "../../lib/utils";
+import { useReactiveWorker } from "../../hooks/useReactiveWorker";
+import { consolidatedSheet, exportEfficiencyTables, sortBy } from "../../lib/utils";
 import { useSchedules } from "../../state/schedules";
 import { useTeachers } from "../../state/teachers";
 import { useTemp } from "../../state/temp";
-import { useReactiveWorker } from "../../hooks/useReactiveWorker";
 
 const ShiftSchedulePage = () => {
   const navigate = useNavigate();
@@ -85,13 +81,22 @@ const ShiftSchedulePage = () => {
   const [response, message, progress, error, setWorkerData] = useReactiveWorker(
     "tutorEfficiencyBuilderWorker"
   );
+  const [
+    consolidateResponse,
+    consolidateMessage,
+    consolidateProgress,
+    consolidateError,
+    setConsolidateWorkerData,
+  ] = useReactiveWorker("consolidateSheetWorker", undefined);
+
+  const [loading, setLoading] = useState(true);
 
   const exportData = () => {
     setExportingData(true);
 
-    // consolidatedSheet(...schedules, selectedDate);
-
-    setWorkerData(sortBy(teachers, ["Name"]));
+    setConsolidateWorkerData(
+      sortBy(schedules, ["ShiftGroup", "Date", "Name", "Time"])
+    );
   };
 
   useEffect(() => {
@@ -106,8 +111,51 @@ const ShiftSchedulePage = () => {
     return () => clearTimeout(disposableTimeout);
   }, [response]);
 
+  useEffect(() => {
+    const disposableTimeout = setTimeout(async () => {
+      if (consolidateResponse) {
+        await consolidatedSheet(consolidateResponse);
+
+        setWorkerData(sortBy(teachers, ["Name"]));
+      }
+    });
+
+    return () => clearTimeout(disposableTimeout);
+  }, [consolidateResponse]);
+
+  useEffect(() => {
+    const disposableTimeout = setTimeout(async () => {
+      if (totalSchedules) {
+        setLoading(false);
+      }
+    });
+
+    return () => clearTimeout(disposableTimeout);
+  }, [totalSchedules]);
+
+  useEffect(() => {
+    const disposableTimeout = setTimeout(async () => {
+      if (totalSchedules === 0) {
+        setLoading(false);
+      }
+    });
+
+    return () => clearTimeout(disposableTimeout);
+  }, []);
+
   return (
     <>
+      <Dialog open={loading}>
+        <DialogContent className="sm:max-w-[425px]">
+          <div className="flex flex-col items-center justify-center w-full h-full">
+            <div className="flex items-center space-x-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <p>Loading data</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={exportingData}>
         <DialogContent className="sm:max-w-[425px]">
           <div className="flex flex-col items-center justify-center w-full h-full">
@@ -140,10 +188,6 @@ const ShiftSchedulePage = () => {
               <PopoverContent className="flex flex-col space-y-1 lg:flex-row w-80 lg:w-auto">
                 <ScheduleMonthSelect />
                 <ScheduleYearSelect />
-                <Button onClick={() => navigate("/upload")}>
-                  <Upload className="w-4 h-4 mr-3" />
-                  Upload Data
-                </Button>
                 <Button onClick={() => exportData()}>
                   <Download className="w-4 h-4 mr-3" />
                   Export Data
@@ -157,10 +201,6 @@ const ShiftSchedulePage = () => {
               <ScheduleMonthSelect />
               <ScheduleYearSelect />
             </div>
-            <Button onClick={() => navigate("/upload")}>
-              <Upload className="w-4 h-4 mr-3" />
-              Upload Data
-            </Button>
             <Button onClick={() => exportData()}>
               <Download className="w-4 h-4 mr-3" />
               Export Data

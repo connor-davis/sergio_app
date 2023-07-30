@@ -11,9 +11,7 @@ const Table = (rows = []) => {
   return self;
 };
 
-self.addEventListener("message", (event) => {});
-
-onmessage = (event) => {
+self.addEventListener("message", (event) => {
   const teachers = event.data;
 
   let ShiftGroups = [];
@@ -67,19 +65,6 @@ onmessage = (event) => {
           schedule,
         ];
       });
-
-      teacher["Invoices"].map((invoice) => {
-        if (!GroupShifts[invoice["Shift"]])
-          GroupShifts[invoice["Shift"]] = {
-            Invoices: [],
-            Schedules: [],
-          };
-
-        GroupShifts[invoice["Shift"]]["Invoices"] = [
-          ...GroupShifts[invoice["Shift"]]["Invoices"],
-          invoice,
-        ];
-      });
     });
 
     const GroupTeachers = [
@@ -93,24 +78,6 @@ onmessage = (event) => {
                 Schedule["ShiftGroup"].split(" ")[0] === "Rotation"
                   ? Schedule["ShiftGroup"].split(" ")[0] === group
                   : Schedule["ShiftGroup"] === group
-              )
-              .map((Schedule) => Schedule["Name"])[0];
-          })
-          .filter((Teacher) => Teacher),
-        ...Object.keys(GroupShifts)
-          .map((groupShift) => {
-            const GroupShift = GroupShifts[groupShift];
-
-            return GroupShift["Invoices"]
-              .filter((Invoice) =>
-                GroupShift["Schedules"]
-                  .filter((Schedule) =>
-                    Schedule["ShiftGroup"].split(" ")[0] === "Rotation"
-                      ? Schedule["ShiftGroup"].split(" ")[0] === group
-                      : Schedule["ShiftGroup"] === group
-                  )
-                  .map((Schedule) => Schedule["Shift"])
-                  .includes(Invoice["Shift"])
               )
               .map((Schedule) => Schedule["Name"])[0];
           })
@@ -251,4 +218,4 @@ onmessage = (event) => {
   });
 
   postMessage({ type: "data", data: Tables });
-};
+});

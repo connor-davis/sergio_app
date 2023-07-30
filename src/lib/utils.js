@@ -328,13 +328,92 @@ export const consolidateData = (
   );
 };
 
+export const consolidatedSheet = async (data) => {
+  const workbook = XLSX.utils.book_new();
+
+  data.map((groupData) => {
+    const groupName = groupData[0]["ShiftGroup"];
+
+    let GroupPivots = [];
+
+    let headerRow = ["Tutor", "Scheduled", "Picked Up", "Dropped"];
+    let bodyRows = [];
+    let footerRow = ["Total"];
+
+    let teacherNames = [];
+
+    const groupDataFixed = groupData.map((groupData) => {
+      delete groupData["ShiftGroup"];
+
+      teacherNames = [...new Set([...teacherNames, groupData["Name"]])];
+
+      return groupData;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(groupDataFixed);
+
+    teacherNames.map((teacherName) => {
+      const teacherSchedules = groupDataFixed.filter(
+        (schedule) => schedule["Name"] === teacherName
+      );
+
+      const pickedUpSchedules = teacherSchedules.filter(
+        (schedule) =>
+          schedule["ShiftType"] === "Pickup" ||
+          schedule["ShiftType"] === "Internal Pickup"
+      );
+
+      const droppedSchedules = teacherSchedules.filter(
+        (schedule) =>
+          schedule["ShiftType"] === "Dropped" ||
+          schedule["ShiftType"] === "Dropped & Picked Up"
+      );
+
+      bodyRows.push([
+        teacherName,
+        teacherSchedules.length,
+        pickedUpSchedules.length,
+        droppedSchedules.length,
+      ]);
+    });
+
+    let totalScheduled = 0;
+    let totalPickedUp = 0;
+    let totalDropped = 0;
+
+    bodyRows.map((bodyRow) => {
+      totalScheduled += bodyRow[1];
+      totalPickedUp += bodyRow[2];
+      totalDropped += bodyRow[3];
+    });
+
+    footerRow.push(totalScheduled);
+    footerRow.push(totalPickedUp);
+    footerRow.push(totalDropped);
+
+    GroupPivots = [headerRow, ...bodyRows, footerRow];
+
+    XLSX.utils.sheet_add_aoa(worksheet, GroupPivots, { origin: "H1" });
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, groupName);
+  });
+
+  await XLSX.writeFile(
+    workbook,
+    "AutomaticReport-Consolidated-Groups-" +
+      format(Date.now(), "yyyy-MM-dd-hh-mm-ss") +
+      ".xlsx",
+    { cellStyles: true, bookType: "xlsx" }
+  );
+};
+
 export const exportEfficiencyTables = async (data) => {
   const workbook = XLSX.utils.book_new();
 
-  data.map((groupTable) => {
-    const worksheet = XLSX.utils.aoa_to_sheet(groupTable[1]);
+  data.map((groupData) => {
+    const worksheet = XLSX.utils.aoa_to_sheet(groupData[1]);
 
-    XLSX.utils.book_append_sheet(workbook, worksheet, groupTable[0]);
+    XLSX.utils.book_append_sheet(workbook, worksheet, groupData[0]);
   });
 
   await XLSX.writeFile(
