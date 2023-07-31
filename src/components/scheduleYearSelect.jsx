@@ -18,8 +18,8 @@ const ScheduleYearSelect = () => {
     <Select
       onValueChange={(value) => {
         const date = parse(
-          `${format(selectedDate, "M")}/${format(Date.now(), "d")}/${value}`,
-          "M/d/yyyy",
+          `${format(selectedDate, "MMMM")} ${value}`,
+          "MMMM yyyy",
           Date.now()
         );
         setSelectedDate(date);

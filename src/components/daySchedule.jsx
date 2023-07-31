@@ -23,7 +23,9 @@ const DaySchedule = ({ day }) => {
 
   useEffect(() => {
     const disposableTimeout = setTimeout(() => {
-      if (localSchedules && localSchedules.length > 0) {
+      if (localSchedules) {
+        setLoading(true);
+
         setDaySchedulesWorkerData({
           schedules: localSchedules,
           selectedDate:
@@ -37,7 +39,7 @@ const DaySchedule = ({ day }) => {
     });
 
     return () => clearTimeout(disposableTimeout);
-  }, [localSchedules]);
+  }, [localSchedules, selectedDate]);
 
   const columns = [
     {

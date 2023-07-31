@@ -18,13 +18,11 @@ const ScheduleMonthSelect = () => {
     <Select
       onValueChange={(value) => {
         const date = parse(
-          `${value.toLocaleLowerCase()}/${format(Date.now(), "d")}/${format(
-            selectedDate,
-            "yyyy"
-          )}`,
-          "MMMM/d/yyyy",
+          `${value} ${format(selectedDate, "yyyy")}`,
+          "MMMM yyyy",
           Date.now()
         );
+
         setSelectedDate(date);
       }}
     >
