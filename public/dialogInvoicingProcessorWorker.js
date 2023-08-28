@@ -519,11 +519,17 @@ self.addEventListener("message", async (event) => {
       });
 
       const Name = row["Name"];
-      const Group = row["Group"];
       const Invoices = row["Invoices"];
       const Schedules = row["Schedules"];
 
-      processedGroups.push(Group);
+      processedGroups = [
+        ...processedGroups,
+        ...Schedules.map((schedule) =>
+          schedule["ShiftGroup"].split(" ")[0] === "Rotation"
+            ? "Rotation"
+            : schedule["ShiftGroup"]
+        ),
+      ];
 
       Schedules.map((schedule, index) => {
         postMessage({
@@ -545,7 +551,6 @@ self.addEventListener("message", async (event) => {
 
       return {
         Name,
-        Group,
         Schedules,
         Invoices,
       };

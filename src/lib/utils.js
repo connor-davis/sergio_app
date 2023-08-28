@@ -26,14 +26,30 @@ export const sortBy = (rows, categories = []) => {
         const aCategorified = categories
           .map((category) =>
             category === "Date" || category === "Time"
-              ? parse(a[category], "M/d/yyyy", Date.now())
+              ? category === "Date"
+                ? compareAsc(
+                    parse(a[category], "M-d-yyyy", Date.now()),
+                    parse(b[category], "M-d-yyyy", Date.now())
+                  )
+                : compareAsc(
+                    parse(a[category], "h:mm a", Date.now()),
+                    parse(b[category], "h:mm a", Date.now())
+                  )
               : a[category]
           )
           .join("");
         const bCategorified = categories
           .map((category) =>
             category === "Date" || category === "Time"
-              ? parse(b[category], "M/d/yyyy", Date.now())
+              ? category === "Date"
+                ? compareAsc(
+                    parse(b[category], "M-d-yyyy", Date.now()),
+                    parse(a[category], "M-d-yyyy", Date.now())
+                  )
+                : compareAsc(
+                    parse(b[category], "h:mm a", Date.now()),
+                    parse(a[category], "h:mm a", Date.now())
+                  )
               : b[category]
           )
           .join("");
@@ -46,8 +62,8 @@ export const sortBy = (rows, categories = []) => {
     : rows.sort((a, b) => {
         if (
           compareAsc(
-            parse(a["Date"], "M/d/yyyy", Date.now()),
-            parse(b["Date"], "M/d/yyyy", Date.now())
+            parse(a["Date"], "M-d-yyyy", Date.now()),
+            parse(b["Date"], "M-d-yyyy", Date.now())
           ) +
             a["Name"] +
             compareAsc(
@@ -55,8 +71,8 @@ export const sortBy = (rows, categories = []) => {
               parse(b["Time"], "h:mm a", Date.now())
             ) >
           compareAsc(
-            parse(b["Date"], "M/d/yyyy", Date.now()),
-            parse(a["Date"], "M/d/yyyy", Date.now())
+            parse(b["Date"], "M-d-yyyy", Date.now()),
+            parse(a["Date"], "M-d-yyyy", Date.now())
           ) +
             b["Name"] +
             compareAsc(
@@ -67,8 +83,8 @@ export const sortBy = (rows, categories = []) => {
           return 1;
         if (
           compareAsc(
-            parse(a["Date"], "M/d/yyyy", Date.now()),
-            parse(b["Date"], "M/d/yyyy", Date.now())
+            parse(a["Date"], "M-d-yyyy", Date.now()),
+            parse(b["Date"], "M-d-yyyy", Date.now())
           ) +
             a["Name"] +
             compareAsc(
@@ -76,8 +92,8 @@ export const sortBy = (rows, categories = []) => {
               parse(b["Time"], "h:mm a", Date.now())
             ) <
           compareAsc(
-            parse(b["Date"], "M/d/yyyy", Date.now()),
-            parse(a["Date"], "M/d/yyyy", Date.now())
+            parse(b["Date"], "M-d-yyyy", Date.now()),
+            parse(a["Date"], "M-d-yyyy", Date.now())
           ) +
             b["Name"] +
             compareAsc(

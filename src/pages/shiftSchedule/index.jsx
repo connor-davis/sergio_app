@@ -28,7 +28,11 @@ import {
   TabsTrigger,
 } from "../../components/ui/tabs";
 import { useReactiveWorker } from "../../hooks/useReactiveWorker";
-import { consolidatedSheet, exportEfficiencyTables, sortBy } from "../../lib/utils";
+import {
+  consolidatedSheet,
+  exportEfficiencyTables,
+  sortBy,
+} from "../../lib/utils";
 import { useSchedules } from "../../state/schedules";
 import { useTeachers } from "../../state/teachers";
 import { useTemp } from "../../state/temp";
@@ -95,7 +99,7 @@ const ShiftSchedulePage = () => {
     setExportingData(true);
 
     setConsolidateWorkerData(
-      sortBy(schedules, ["ShiftGroup", "Date", "Name", "Time"])
+      sortBy(schedules, ["Date", "Name", "Time", "ShiftGroup"])
     );
   };
 
